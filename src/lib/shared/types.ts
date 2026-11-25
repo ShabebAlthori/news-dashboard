@@ -103,7 +103,7 @@ export interface StatusResponse {
   articles: number;
   stories: number;
   ai: {
-    provider: "anthropic" | "ollama" | "none";
+    provider: "anthropic" | "gemini" | "ollama" | "none";
     model: string | null;
     configured: boolean;
     lastError: string | null;

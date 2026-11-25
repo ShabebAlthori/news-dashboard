@@ -34,7 +34,7 @@ const en = {
   "status.staticNote": "Feeds update automatically about every 15 minutes.",
   "status.checkUpdates": "Check for updates",
   "settings.staticUpdates": "This web edition updates itself automatically about every 15 minutes, even when your computer is off.",
-  "settings.aiHowToStatic": "To turn them on, add a repository secret named ANTHROPIC_API_KEY on GitHub (Settings → Secrets and variables → Actions). The next update will start summarizing.",
+  "settings.aiHowToStatic": "To turn them on for free, create a Gemini API key at aistudio.google.com/apikey and add it on GitHub as a repository secret named GEMINI_API_KEY (Settings → Secrets and variables → Actions). The next update will start summarizing.",
   "settings.localData": "Saved stories, read history and these settings are stored only in this browser on this device.",
 
   "dash.title": "Your briefing",
@@ -167,7 +167,7 @@ const en = {
   "settings.ai": "Summaries & translation",
   "settings.aiOn": "AI summaries are on ({model}).",
   "settings.aiOff": "AI summaries are off. Cards show the publisher's own excerpt and Arabic summaries are not available.",
-  "settings.aiHowTo": "To turn them on, set ANTHROPIC_API_KEY on the server — or AI_PROVIDER=ollama for a free local model — and restart. See the README.",
+  "settings.aiHowTo": "To turn them on, set GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY on the server — or AI_PROVIDER=ollama for a local model — and restart. See the README.",
   "settings.aiPending": { zero: "All recent stories are summarized.", one: "1 story is waiting for a summary.", other: "{n} stories are waiting for a summary." },
   "settings.aiError": "Last error: {e}",
   "settings.aiAccuracy": "Summaries are written only from the text each publisher offers in its feed. A summary that contains any number not found in the source is discarded and the publisher's excerpt is shown instead.",
@@ -232,7 +232,7 @@ const ar: Record<I18nKey, Entry> = {
   "status.staticNote": "تُحدَّث الأخبار تلقائيًا كل 15 دقيقة تقريبًا.",
   "status.checkUpdates": "التحقق من التحديثات",
   "settings.staticUpdates": "تُحدِّث النسخة الإلكترونية نفسها تلقائيًا كل 15 دقيقة تقريبًا، حتى عندما يكون حاسوبك مطفأً.",
-  "settings.aiHowToStatic": "لتفعيلها، أضف سرًّا باسم ANTHROPIC_API_KEY إلى المستودع على GitHub (الإعدادات ← Secrets and variables ← Actions)، وسيبدأ التلخيص مع التحديث التالي.",
+  "settings.aiHowToStatic": "لتفعيلها مجانًا، أنشئ مفتاح Gemini من aistudio.google.com/apikey ثم أضفه إلى المستودع على GitHub سرًّا باسم GEMINI_API_KEY (الإعدادات ← Secrets and variables ← Actions)، وسيبدأ التلخيص مع التحديث التالي.",
   "settings.localData": "تُحفظ الأخبار المحفوظة وسجل القراءة وهذه الإعدادات في هذا المتصفح على هذا الجهاز فقط.",
 
   "dash.title": "موجزك",
@@ -372,7 +372,7 @@ const ar: Record<I18nKey, Entry> = {
   "settings.ai": "الملخصات والترجمة",
   "settings.aiOn": "الملخصات الآلية مفعّلة ({model}).",
   "settings.aiOff": "الملخصات الآلية غير مفعّلة؛ لذا تعرض البطاقات مقتطف الناشر نفسه ولا تتوفر ملخصات عربية.",
-  "settings.aiHowTo": "لتفعيلها، عيّن المتغير ANTHROPIC_API_KEY على الخادم — أو AI_PROVIDER=ollama لاستخدام نموذج محلي مجاني — ثم أعد التشغيل. التفاصيل في ملف README.",
+  "settings.aiHowTo": "لتفعيلها، عيّن المتغير GEMINI_API_KEY (مجاني) أو ANTHROPIC_API_KEY على الخادم — أو AI_PROVIDER=ollama لنموذج محلي — ثم أعد التشغيل. التفاصيل في ملف README.",
   "settings.aiPending": {
     zero: "تم تلخيص جميع الأخبار الحديثة.",
     one: "خبر واحد بانتظار التلخيص.",

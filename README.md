@@ -30,7 +30,11 @@ The web edition is a free, always-on copy of the dashboard hosted on GitHub Page
 - **Automatic updates.** A GitHub Actions workflow ([`.github/workflows/web-edition.yml`](.github/workflows/web-edition.yml)) runs about every 15 minutes, even when your computer is off. Each run fetches the feeds, deduplicates, clusters, scores and (optionally) summarizes the news, then publishes the result. GitHub sometimes starts scheduled runs a few minutes late.
 - **Same features.** All pages, filters, search, Arabic/English, dark mode and importance ranking work as in the self-hosted version. Ranking and search run in your browser over the latest published data (the last 7 days).
 - **Your data stays in your browser.** Saved stories, read history (used by "You might have missed") and settings are kept in the browser's storage on each device, not on GitHub.
-- **AI summaries and Arabic translation.** On GitHub, open **Settings → Secrets and variables → Actions → New repository secret** and add `ANTHROPIC_API_KEY`. Optionally add a *variable* `ANTHROPIC_MODEL` (for example `claude-haiku-5-5` for much lower cost) and `AI_DAILY_LIMIT`. The next run starts summarizing. Without a key, the page shows the publishers' own excerpts.
+- **AI summaries and Arabic translation (free option).**
+  1. Create a free Gemini API key at <https://aistudio.google.com/apikey> (sign in with a Google account, then **Create API key**).
+  2. On GitHub, open **Settings → Secrets and variables → Actions → New repository secret** and add it as `GEMINI_API_KEY`.
+
+  The next run starts summarizing. Alternatively add `ANTHROPIC_API_KEY` for Claude (paid; used first if both are set). Without a key, the page shows the publishers' own excerpts.
 - **Visibility.** GitHub Pages sites from free accounts are public, so anyone with the link can open the page. It asks search engines not to index it. No keys or passwords are ever published.
 - **Manual update.** Open the **Actions** tab → **Web edition** → **Run workflow**.
 - **Schedule pauses.** GitHub pauses schedules after 60 days without repository activity. The workflow makes an empty commit when needed to keep it running.
@@ -180,8 +184,11 @@ Feeds give an English headline and usually a short excerpt. Producing natural Ar
 | Option | Cost | Arabic quality | Setup |
 | --- | --- | --- | --- |
 | **Claude (default)** | Paid per use | Natural, idiomatic Arabic | `ANTHROPIC_API_KEY=...` |
+| **Google Gemini (free tier)** | Free, within Google's daily limits | Good | Free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then `GEMINI_API_KEY=...` (or the GitHub secret of the same name) |
 | **Ollama (free)** | Free; runs on your own machine | Depends on the model (Qwen 2.5 7B and larger handle Arabic reasonably; smaller models are weaker) | Install [Ollama](https://ollama.com), `ollama pull qwen2.5:7b-instruct`, set `AI_PROVIDER=ollama` |
 | **No AI** | Free | No Arabic summaries | Default when no key is set |
+
+**About the Gemini free tier:** Google lists `gemini-3.8-flash` and `gemini-3.5-flash-lite` as free of charge on the free tier, within per-minute and per-day request limits shown in AI Studio. The app spaces requests about 6.5 seconds apart, switches to `gemini-3.5-flash-lite` when the main model's daily quota is used up, and shows publisher excerpts for anything left unsummarized. Google states that free-tier requests may be used to improve its products; here they contain only public news text from the feeds.
 
 ### Costs (Claude)
 
@@ -241,11 +248,13 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `DISABLE_SCHEDULER` | `false` | Turn off the in-process scheduler (use `npm run worker` or cron instead) |
 | `CRON_SECRET` | — | Enables `POST /api/refresh` with `Authorization: Bearer <secret>` |
 | `FETCH_CONTACT` | — | Contact URL/email appended to the User-Agent |
-| `AI_PROVIDER` | auto | `anthropic`, `ollama` or `none` |
+| `AI_PROVIDER` | auto | `anthropic`, `gemini`, `ollama` or `none` (auto: Claude if its key is set, else Gemini, else none) |
 | `ANTHROPIC_API_KEY` | — | Claude API key |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` | Model id |
 | `ANTHROPIC_EFFORT` | `low` | `low`, `medium` or `high` |
 | `ANTHROPIC_FALLBACKS` | `default` | Server-side refusal fallbacks (`off` to disable) |
+| `GEMINI_API_KEY` | — | Google Gemini API key (free tier available) |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | `gemini-3.8-flash` / `gemini-3.5-flash-lite` | Gemini models (fallback used when the main model's quota is used up) |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `qwen2.5:7b-instruct` | Free local model |
 | `AI_MAX_ARTICLES_PER_RUN` / `AI_DAILY_LIMIT` / `AI_CONCURRENCY` | `30` / `200` / `3` | Cost and throughput guards |
 | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | — | HTTP Basic auth for the whole app when both are set |
@@ -319,7 +328,7 @@ npm run typecheck
 npm run lint
 ```
 
-54 automated tests cover:
+57 automated tests cover:
 
 - feed parsing (RSS 2.0, Atom, RDF, missing dates)
 - text cleanup (decimals, entities, tracking parameters)
@@ -331,7 +340,7 @@ npm run lint
 - robots Content-Signal parsing
 - search query building (including Arabic synonyms)
 - Arabic plural forms
-- the Claude and Ollama clients against local mock servers
+- the Claude, Gemini and Ollama clients against local mock servers
 - the web edition's in-browser ranking, filters, Arabic search, saved stories and dashboard
 - a full pipeline run with a mocked network (cross-feed deduplication, clustering, an outage that preserves articles, rejection of a summary with an invented number, AI exclusion, dashboard and search)
 

@@ -51,7 +51,11 @@ jobs:
         env:
           RETENTION_DAYS: "14"
           SNAPSHOT_DAYS: "7"
-          # Optional: add an ANTHROPIC_API_KEY repository secret for AI summaries and Arabic translation.
+          # Optional AI summaries and Arabic translation — add ONE repository secret:
+          #   GEMINI_API_KEY    free tier, from https://aistudio.google.com/apikey
+          #   ANTHROPIC_API_KEY paid, Claude (used first if both are set)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-opus-5-5' }}
           AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '200' }}

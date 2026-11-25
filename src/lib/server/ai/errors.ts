@@ -1,4 +1,4 @@
-export type AiErrorKind = "auth" | "rate-limit" | "unavailable" | "invalid" | "refusal" | "unverified";
+export type AiErrorKind = "auth" | "rate-limit" | "unavailable" | "config" | "invalid" | "refusal" | "unverified";
 
 export class AiError extends Error {
   constructor(
@@ -11,6 +11,6 @@ export class AiError extends Error {
 
   /** Errors that make further calls in this run pointless. */
   get stopsRun(): boolean {
-    return this.kind === "auth" || this.kind === "rate-limit" || this.kind === "unavailable";
+    return this.kind === "auth" || this.kind === "rate-limit" || this.kind === "unavailable" || this.kind === "config";
   }
 }

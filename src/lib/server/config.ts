@@ -15,13 +15,14 @@ function bool(name: string, fallback: boolean): boolean {
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
-export type AiProvider = "anthropic" | "ollama" | "none";
+export type AiProvider = "anthropic" | "gemini" | "ollama" | "none";
 
 function resolveProvider(): AiProvider {
   const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
-  if (explicit === "anthropic" || explicit === "ollama" || explicit === "none") return explicit;
-  // Auto: use Claude when a key is present, otherwise no AI (feed excerpts only).
+  if (explicit === "anthropic" || explicit === "gemini" || explicit === "ollama" || explicit === "none") return explicit;
+  // Auto: Claude if its key is set, else Gemini (free tier available), else no AI (feed excerpts only).
   if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) return "anthropic";
+  if (process.env.GEMINI_API_KEY) return "gemini";
   return "none";
 }
 
@@ -46,6 +47,12 @@ export const config = {
     anthropicFallbacks: (process.env.ANTHROPIC_FALLBACKS || "default").toLowerCase() !== "off",
     ollamaBaseUrl: (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, ""),
     ollamaModel: process.env.OLLAMA_MODEL || "qwen2.5:7b-instruct",
+    geminiApiKey: process.env.GEMINI_API_KEY || "",
+    geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
+    geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.5-flash-lite",
+    geminiBaseUrl: (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, ""),
+    /** Free-tier friendly spacing between Gemini requests. */
+    geminiMinIntervalMs: int("GEMINI_MIN_INTERVAL_MS", 6500, 0, 60000),
     maxPerRun: int("AI_MAX_ARTICLES_PER_RUN", 30, 0, 500),
     dailyLimit: int("AI_DAILY_LIMIT", 200, 0, 10000),
     concurrency: int("AI_CONCURRENCY", 3, 1, 10),
@@ -62,6 +69,8 @@ export function aiModelLabel(): string | null {
       return config.ai.anthropicModel;
     case "ollama":
       return config.ai.ollamaModel;
+    case "gemini":
+      return config.ai.geminiModel;
     default:
       return null;
   }

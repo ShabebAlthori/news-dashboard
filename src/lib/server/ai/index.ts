@@ -11,6 +11,7 @@ import { recomputeCluster } from "../cluster";
 import { setAiStatus } from "../settings";
 import { sourceById } from "../sources";
 import { summarizeWithClaude } from "./anthropic";
+import { summarizeWithGemini } from "./gemini";
 import { AiError } from "./errors";
 import { summarizeWithOllama } from "./ollama";
 import { unverifiedNumbers, type AiOutput, type PromptArticle } from "./prompt";
@@ -33,6 +34,7 @@ const BUSINESS_CATEGORIES = new Set(["earnings", "acquisitions", "partnerships",
 
 async function callProvider(article: PromptArticle) {
   if (config.ai.provider === "anthropic") return summarizeWithClaude(article);
+  if (config.ai.provider === "gemini") return summarizeWithGemini(article);
   if (config.ai.provider === "ollama") return summarizeWithOllama(article);
   throw new AiError("auth", "No AI provider configured");
 }
@@ -161,6 +163,8 @@ export async function enrichStories(db: Database.Database, opts: { maxArticles?:
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(config.ai.concurrency, rows.length) }, worker));
+  // Gemini's free tier is rate-limited per minute, so its requests run one at a time.
+  const concurrency = config.ai.provider === "gemini" ? 1 : config.ai.concurrency;
+  await Promise.all(Array.from({ length: Math.min(concurrency, rows.length) }, worker));
   return done;
 }
