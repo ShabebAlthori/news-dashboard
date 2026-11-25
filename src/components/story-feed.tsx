@@ -6,7 +6,7 @@ import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import { RANGE_KEYS, rangeToBounds, type RangeKey } from "@/lib/shared/format";
-import { categoriesFor, COMPANIES, type Section } from "@/lib/shared/taxonomy";
+import { categoriesFor, categoryLabel, COMPANIES, MORE_TOPIC_IDS, PRIORITY_IDS, type Section } from "@/lib/shared/taxonomy";
 import type { Prefs, StoriesResponse } from "@/lib/shared/types";
 import { useNow, useUi } from "./providers";
 import { StoryCard } from "./story-card";
@@ -18,7 +18,10 @@ export interface FeedConfig {
   section?: Section | "all";
   defaultSort?: "importance" | "newest";
   defaultRange?: RangeKey;
+  /** Detailed sub-topic chips for these sections (e.g. the Gaming page). */
   categorySections?: Section[];
+  /** Chips for the reader's priority categories (in their order), then the extra topics. */
+  priorityChips?: boolean;
   showCompanyFilter?: boolean;
   savedOnly?: boolean;
   company?: string;
@@ -110,7 +113,10 @@ export function StoryFeed(cfg: FeedConfig) {
   const generatedAt = data?.[0]?.generatedAt;
   const newer = !!(generatedAt && status?.lastSuccessAt && new Date(status.lastSuccessAt).getTime() > new Date(generatedAt).getTime() + 1000);
 
-  const categories = (cfg.categorySections ?? []).flatMap((s) => categoriesFor(s));
+  const order = prefs?.categoryOrder?.length ? prefs.categoryOrder : PRIORITY_IDS;
+  const categories: { id: string; en: string; ar: string }[] = cfg.priorityChips
+    ? [...order, ...MORE_TOPIC_IDS].map((id) => ({ id, ...(categoryLabel(id) ?? { en: id, ar: id }) }))
+    : (cfg.categorySections ?? []).flatMap((s) => categoriesFor(s));
   const followed = new Set(prefs?.followedCompanies ?? []);
   const companyOptions = [...COMPANIES].sort((a, b) => Number(followed.has(b.id)) - Number(followed.has(a.id)) || a.en.localeCompare(b.en));
   const filtered = p.category || p.company !== (cfg.company ?? "") || p.range !== (cfg.defaultRange ?? "3d") || p.sort !== (cfg.defaultSort ?? "importance") || !p.group;

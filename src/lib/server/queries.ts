@@ -1,8 +1,8 @@
 import type Database from "better-sqlite3";
-import { COMPANIES, type EventType, type Section } from "@/lib/shared/taxonomy";
-import type { CompanyPulse, CoverageRef, DashboardResponse, Prefs, SnapshotStory, Story, StoriesResponse } from "@/lib/shared/types";
+import { COMPANIES, topicsOf, type EventType, type Section } from "@/lib/shared/taxonomy";
+import type { CategoryPulse, CompanyPulse, CoverageRef, DashboardResponse, Prefs, SnapshotStory, Story, StoriesResponse } from "@/lib/shared/types";
 import { getDb, parseJsonArray } from "./db";
-import { coverageFactor, finalScore, impactFactor, isBreaking, relevanceFactor, tier, type RelevancePrefs } from "./scoring";
+import { coverageFactor, finalScore, impactFactor, isBreaking, relevanceFactor, tier, toRelevancePrefs, type RelevancePrefs } from "./scoring";
 import { searchTerms } from "@/lib/shared/search";
 import { getPrefs } from "./settings";
 import { SOURCES, sourceById } from "./sources";
@@ -62,11 +62,7 @@ export interface StoryQuery {
 }
 
 function relevancePrefs(prefs: Prefs): RelevancePrefs {
-  return {
-    interests: new Set(prefs.interests),
-    followed: new Set(prefs.followedCompanies),
-    allInterests: prefs.interests.length === 0 || prefs.interests.length >= 23,
-  };
+  return toRelevancePrefs(prefs);
 }
 
 const iso = (t: number | null) => (t == null ? null : new Date(t).toISOString());
@@ -117,7 +113,8 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
         publishedAt: iso(m.published_at),
         fetchedAt: iso(m.fetched_at)!,
         official: src?.kind === "official",
-        excerpt: m.summary_en,
+        excerpt: m.summary_en ?? m.summary_ar,
+        lang: src?.lang ?? "en",
       };
     });
     const src = sourceById(lead.source_id);
@@ -135,6 +132,7 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
         aiModel: lead.ai_model,
       },
       url: lead.url,
+      lang: src?.lang ?? "en",
       source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official" },
       publishedAt: iso(lead.published_at),
       fetchedAt: iso(lead.fetched_at)!,
@@ -192,8 +190,10 @@ function candidates(db: Database.Database, q: StoryQuery, prefs: Prefs, opts: { 
     params.push(`%"${q.section}"%`);
   }
   if (q.category) {
-    where.push("c.categories LIKE ?");
-    params.push(`%"${q.category}"%`);
+    // A priority category (e.g. "hardware-gaming") matches any of its topics.
+    const topics = topicsOf(q.category);
+    where.push(`(${topics.map(() => "c.categories LIKE ?").join(" OR ")})`);
+    params.push(...topics.map((t) => `%"${t}"%`));
   }
   if (q.company) {
     where.push("c.companies LIKE ?");
@@ -286,6 +286,7 @@ function listUngrouped(db: Database.Database, clusters: Candidate[], now: number
         title: { original: lead.title, en: lead.title_en || lead.title, ar: lead.title_ar },
         summary: { en: lead.summary_en, ar: lead.summary_ar, origin: lead.summary_origin as Story["summary"]["origin"], aiModel: lead.ai_model },
         url: lead.url,
+        lang: src?.lang ?? "en",
         source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official" },
         publishedAt: iso(lead.published_at),
         fetchedAt: iso(lead.fetched_at)!,
@@ -359,8 +360,24 @@ export function getDashboard(): DashboardResponse {
     .map((p) => ({ companyId: p.companyId, count: p.count, top: p.top ? (pulseStories.get(p.top.id) ?? null) : null }))
     .sort((a, b) => b.count - a.count);
 
+  // The reader's priority categories, in their order (enabled ones only).
+  const catLists = prefs.categoryOrder
+    .filter((id) => prefs.interests.includes(id))
+    .map((categoryId) => {
+      const topics = topicsOf(categoryId);
+      const list = recent48.filter((c) => parseJsonArray(c.categories).some((t) => topics.includes(t)));
+      return { categoryId, count: list.length, top: list.slice(0, 3) };
+    });
+  const catStories = new Map(hydrate(db, [...new Map(catLists.flatMap((c) => c.top).map((c) => [c.id, c])).values()], now, enabled).map((s) => [s.id, s]));
+  const byCategory: CategoryPulse[] = catLists.map((c) => ({
+    categoryId: c.categoryId,
+    count: c.count,
+    stories: c.top.map((x) => catStories.get(x.id)).filter((s): s is Story => !!s),
+  }));
+
   const h = (list: Candidate[]) => hydrate(db, list, now, enabled);
   return {
+    byCategory,
     top: h(top),
     tech: h(tech),
     gaming: h(gaming),

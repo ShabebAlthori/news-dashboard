@@ -14,6 +14,8 @@ export interface CoverageRef {
   official: boolean;
   /** The publisher's own excerpt for this article (used when stories are not grouped). */
   excerpt?: string | null;
+  /** Language the article was published in. */
+  lang?: Lang;
 }
 
 export type SummaryOrigin = "ai" | "feed" | "none";
@@ -33,6 +35,8 @@ export interface Story {
   title: { original: string; en: string; ar: string | null };
   summary: { en: string | null; ar: string | null; origin: SummaryOrigin; aiModel: string | null };
   url: string;
+  /** Language the lead article was published in ("ar" for Arabic-language sources). */
+  lang: Lang;
   source: { id: string; name: string; official: boolean };
   publishedAt: string | null; // as reported by the source; null if the source gave none
   fetchedAt: string; // when this dashboard first retrieved the lead article
@@ -65,7 +69,15 @@ export interface CompanyPulse {
   top: Story | null;
 }
 
+export interface CategoryPulse {
+  categoryId: string; // a priority category id
+  count: number; // stories in the last 48 hours
+  stories: Story[]; // the most important few
+}
+
 export interface DashboardResponse {
+  /** The reader's priority categories, in their order. */
+  byCategory: CategoryPulse[];
   top: Story[];
   tech: Story[];
   gaming: Story[];
@@ -113,7 +125,8 @@ export interface StatusResponse {
 }
 
 export interface Prefs {
-  interests: string[]; // category ids
+  interests: string[]; // enabled priority categories / extra topics (legacy: topic ids)
+  categoryOrder: string[]; // the reader's priority order of the 8 categories
   followedCompanies: string[];
   showReviews: boolean;
   includeTechPolicy: boolean;
@@ -124,6 +137,7 @@ export interface Prefs {
 
 export const DEFAULT_PREFS: Prefs = {
   interests: [],
+  categoryOrder: [],
   followedCompanies: [],
   showReviews: false,
   includeTechPolicy: true,

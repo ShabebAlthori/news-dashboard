@@ -10,6 +10,8 @@
 // - Google News RSS as a Reuters proxy: news.google.com/robots.txt disallows /rss.
 // - The Register: robots.txt default-denies unlisted crawlers and requires a licence for AI use.
 // - Unity Blog: unity.com/robots.txt disallows /blog/rss.
+// - Snowflake Blog: snowflake.com/robots.txt disallows /feed/.
+// - InfoWorld: infoworld.com/robots.txt disallows the feed for unlisted crawlers.
 
 export type SourceSection = "tech" | "gaming" | "official";
 
@@ -28,6 +30,8 @@ export interface SourceDef {
   company?: string;
   /** Default section(s) for items when keywords are inconclusive. */
   defaults: ("tech" | "gaming" | "business")[];
+  /** Language the source publishes in (default English). */
+  lang?: "en" | "ar";
 }
 
 export const SOURCES: SourceDef[] = [
@@ -41,6 +45,22 @@ export const SOURCES: SourceDef[] = [
   { id: "tomshardware", name: "Tom's Hardware", publisher: "tomshardware", url: "https://www.tomshardware.com/feeds.xml", homepage: "https://www.tomshardware.com", section: "tech", kind: "publisher", credibility: 0.82, defaults: ["tech"] },
   { id: "bleepingcomputer", name: "BleepingComputer", publisher: "bleepingcomputer", url: "https://www.bleepingcomputer.com/feed/", homepage: "https://www.bleepingcomputer.com", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"] },
   { id: "therecord", name: "The Record", publisher: "therecord", url: "https://therecord.media/feed", homepage: "https://therecord.media", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"] },
+
+  // ---- Data science & analytics ----
+  { id: "siliconangle-data", name: "SiliconANGLE — Data", publisher: "siliconangle", url: "https://siliconangle.com/category/big-data/feed/", homepage: "https://siliconangle.com/category/big-data/", section: "tech", kind: "publisher", credibility: 0.8, defaults: ["tech"] },
+  { id: "kdnuggets", name: "KDnuggets", publisher: "kdnuggets", url: "https://www.kdnuggets.com/feed", homepage: "https://www.kdnuggets.com", section: "tech", kind: "publisher", credibility: 0.7, defaults: ["tech"] },
+  { id: "towards-data-science", name: "Towards Data Science", publisher: "tds", url: "https://towardsdatascience.com/feed", homepage: "https://towardsdatascience.com", section: "tech", kind: "publisher", credibility: 0.68, defaults: ["tech"] },
+
+  // ---- Robotics ----
+  { id: "robot-report", name: "The Robot Report", publisher: "robotreport", url: "https://www.therobotreport.com/feed/", homepage: "https://www.therobotreport.com", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"] },
+  { id: "ieee-robotics", name: "IEEE Spectrum — Robotics", publisher: "ieee-spectrum", url: "https://spectrum.ieee.org/feeds/topic/robotics.rss", homepage: "https://spectrum.ieee.org/topic/robotics/", section: "tech", kind: "publisher", credibility: 0.92, defaults: ["tech"] },
+  { id: "techcrunch-robotics", name: "TechCrunch — Robotics", publisher: "techcrunch", url: "https://techcrunch.com/category/robotics/feed/", homepage: "https://techcrunch.com/category/robotics/", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"] },
+
+  // ---- Saudi technology & startups ----
+  { id: "wamda", name: "Wamda", publisher: "wamda", url: "https://www.wamda.com/feed", homepage: "https://www.wamda.com", section: "tech", kind: "publisher", credibility: 0.8, defaults: ["tech", "business"] },
+  { id: "techcrunch-saudi", name: "TechCrunch — Saudi Arabia", publisher: "techcrunch", url: "https://techcrunch.com/tag/saudi-arabia/feed/", homepage: "https://techcrunch.com/tag/saudi-arabia/", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech", "business"] },
+  { id: "aitnews", name: "البوابة التقنية (AIT News)", publisher: "aitnews", url: "https://aitnews.com/feed/", homepage: "https://aitnews.com", section: "tech", kind: "publisher", credibility: 0.78, defaults: ["tech"], lang: "ar" },
+  { id: "tech-wd", name: "عالم التقنية (Tech-WD)", publisher: "tech-wd", url: "https://www.tech-wd.com/wd/feed/", homepage: "https://www.tech-wd.com", section: "tech", kind: "publisher", credibility: 0.72, defaults: ["tech"], lang: "ar" },
 
   // ---- Gaming publishers ----
   { id: "ign", name: "IGN", publisher: "ign", url: "https://feeds.ign.com/ign/news", homepage: "https://www.ign.com", section: "gaming", kind: "publisher", credibility: 0.8, defaults: ["gaming"] },

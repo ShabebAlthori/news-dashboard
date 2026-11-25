@@ -42,7 +42,7 @@ Classification:
   1 = trivial or not news: listicles, how-tos, promotional posts.
 - excluded_topic: the reason if the article is mainly about politics or elections, political conflicts, sports results or sports business unrelated to video games, celebrity gossip, film/TV/music entertainment, shopping deals, or clickbait and viral trivia; otherwise "none". Technology regulation, antitrust, export controls and lawsuits involving technology or gaming companies are not politics. Video games — including games based on films and sports video games — are not entertainment or sports.
 - speculative: true when the main claim is unconfirmed.
-- categories: at most 3 ids from the allowed list that clearly apply.
+- categories: at most 3 ids from the allowed list that clearly apply. "data" = data science, analytics and data platforms; "saudi" = technology or startups in Saudi Arabia; "robotics" = robots, drones and autonomous machines; "strategy" = funding, investment and strategic moves.
 - companies: ids of listed companies the story is substantially about (not passing mentions).`;
 
 export interface PromptArticle {

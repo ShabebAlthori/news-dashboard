@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { mutate } from "swr";
 import { formatDateTime, formatRelative } from "@/lib/shared/format";
-import { categoryById, companyById, EVENT_LABELS, SECTIONS } from "@/lib/shared/taxonomy";
-import type { Lang, Story } from "@/lib/shared/types";
+import useSWR from "swr";
+import { categoryLabel, companyById, EVENT_LABELS, PRIORITY_IDS, primaryCategory, SECTIONS } from "@/lib/shared/taxonomy";
+import type { Lang, Prefs, Story } from "@/lib/shared/types";
+import { storyHeadline, storySummary } from "./story-text";
 import { useNow, useUi } from "./providers";
 import { markRead, saveStory } from "@/lib/client/actions";
 
@@ -89,6 +91,7 @@ export function StoryCard({
 }) {
   const { t, lang: uiLang } = useUi();
   const now = useNow();
+  const { data: prefs } = useSWR<Prefs>("/api/settings");
   const [override, setOverride] = useState<{ ui: Lang; view: Lang } | null>(null);
   const [saved, setSaved] = useState(story.saved);
   const [savedFor, setSavedFor] = useState(story.saved);
@@ -101,21 +104,14 @@ export function StoryCard({
   const view: Lang = override && override.ui === uiLang ? override.view : uiLang;
   const otherLang: Lang = view === "ar" ? "en" : "ar";
 
-  const headline = view === "ar" ? (story.title.ar ?? story.title.original) : story.title.en;
-  const headlineLang: Lang = view === "ar" && story.title.ar ? "ar" : "en";
+  const originalLang: Lang = story.lang ?? "en";
+  const { text: headline, lang: headlineLang } = storyHeadline(story, view);
   const showOriginal = headline !== story.title.original;
 
-  let summary: string | null;
-  let summaryLang: Lang;
-  let summaryNote: string | null = null;
-  if (view === "ar") {
-    summary = story.summary.ar ?? story.summary.en;
-    summaryLang = story.summary.ar ? "ar" : "en";
-    if (!story.summary.ar && story.summary.en) summaryNote = t("card.arUnavailable");
-  } else {
-    summary = story.summary.en;
-    summaryLang = "en";
-  }
+  const summaryInfo = storySummary(story, view);
+  const summary = summaryInfo?.text ?? null;
+  const summaryLang: Lang = summaryInfo?.lang ?? view;
+  const summaryNote = summaryInfo?.note ? t(`card.${summaryInfo.note}`) : null;
   const summaryOriginLabel =
     story.summary.origin === "ai" && (view === "en" || story.summary.ar)
       ? t("card.summaryAi")
@@ -123,21 +119,11 @@ export function StoryCard({
         ? t("card.summaryFeed")
         : t("card.noSummary");
 
-  const firstCategory = story.categories.map((c) => categoryById(c)).find(Boolean);
+  // The story's highest category in the reader's priority order.
+  const primary = primaryCategory(story.categories, prefs?.categoryOrder ?? PRIORITY_IDS);
   const sectionLabel = SECTIONS.find((s) => story.sections.includes(s.id) && s.id !== "business") ?? SECTIONS.find((s) => story.sections.includes(s.id));
-  const categoryLabel = firstCategory ? firstCategory[uiLang] : sectionLabel?.[uiLang];
-  // Show the event label only when it adds information beyond the category chip.
-  const EVENT_CATEGORY: Partial<Record<Story["eventType"], string>> = {
-    acquisition: "acquisitions",
-    earnings: "earnings",
-    layoffs: "layoffs",
-    leadership: "leadership",
-    partnership: "partnerships",
-    "security-incident": "security",
-  };
-  const businessEvent =
-    ["acquisition", "earnings", "layoffs", "leadership", "partnership", "funding", "regulation", "security-incident", "outage", "delay", "pricing"].includes(story.eventType) &&
-    EVENT_CATEGORY[story.eventType] !== firstCategory?.id;
+  const categoryText = primary ? categoryLabel(primary)?.[uiLang] : sectionLabel?.[uiLang];
+  const businessEvent = ["acquisition", "earnings", "layoffs", "leadership", "partnership", "funding", "regulation", "security-incident", "outage", "delay", "pricing"].includes(story.eventType);
 
   async function toggleSave() {
     const next = !saved;
@@ -161,7 +147,7 @@ export function StoryCard({
                 {t("card.breaking")}
               </Chip>
             )}
-            {categoryLabel && <Chip>{categoryLabel}</Chip>}
+            {categoryText && <Chip>{categoryText}</Chip>}
             {businessEvent && <Chip>{EVENT_LABELS[story.eventType][uiLang]}</Chip>}
             {story.rumor && (
               <Chip tone="caution" title={t("card.unconfirmedHint")}>
@@ -190,7 +176,7 @@ export function StoryCard({
           {showOriginal && variant !== "compact" && (
             <p className="mt-1 text-sm text-subtle">
               <span>{t("card.originalHeadline")}: </span>
-              <span lang="en" dir="ltr" className="bidi-isolate">
+              <span lang={originalLang} dir={originalLang === "ar" ? "rtl" : "ltr"} className="bidi-isolate">
                 {story.title.original}
               </span>
             </p>
@@ -217,7 +203,7 @@ export function StoryCard({
           {/* Meta */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
             <span className="inline-flex items-center gap-1 font-medium text-fg">
-              <span lang="en" className="bidi-isolate">
+              <span dir="auto" className="bidi-isolate">
                 {story.source.name}
               </span>
               {story.source.official && <BadgeCheck className="size-3.5 text-ok" aria-label={t("card.officialHint")} />}
@@ -294,7 +280,7 @@ export function StoryCard({
                     {story.coverage.map((c) => (
                       <li key={c.articleId} className="text-sm">
                         <span className="font-medium text-fg">
-                          <span lang="en" className="bidi-isolate">
+                          <span dir="auto" className="bidi-isolate">
                             {c.sourceName}
                           </span>
                           {c.official && <BadgeCheck className="ms-1 inline size-3.5 text-ok" aria-label={t("card.officialHint")} />}
@@ -305,8 +291,8 @@ export function StoryCard({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => markRead(c.articleId, c.url)}
-                          lang="en"
-                          dir="ltr"
+                          lang={c.lang ?? "en"}
+                          dir={c.lang === "ar" ? "rtl" : "ltr"}
                           className="mt-0.5 block text-muted hover:text-accent hover:underline"
                         >
                           {c.title}

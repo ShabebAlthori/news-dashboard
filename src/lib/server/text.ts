@@ -62,7 +62,7 @@ export function splitSentences(text: string): string[] {
     .replace(/\b(Mr|Ms|Mrs|Dr|Inc|Corp|Ltd|Co|vs|St|No|Jr|Sr|e\.g|i\.e)\./g, (m) => m.replace(/\./g, DOT))
     .replace(/\b([A-Z])\.(?=\s?[A-Z]\.|\s+[a-z])/g, `$1${DOT}`)
     .replace(/\b(U|E)\.(S|K|U)\./g, `$1${DOT}$2${DOT}`);
-  const parts = protectedText.match(/[^.!?]+(?:[.!?]+["'”’)\]]*|$)/g) ?? [protectedText];
+  const parts = protectedText.match(/[^.!?؟]+(?:[.!?؟]+["'”’)\]»]*|$)/g) ?? [protectedText];
   return parts.map((p) => p.replaceAll(DOT, ".").trim()).filter(Boolean);
 }
 
@@ -160,16 +160,37 @@ function stem(token: string): string {
   return t;
 }
 
+// Common Arabic function words, ignored when comparing headlines.
+const AR_STOPWORDS = new Set(
+  "في من على إلى الى عن مع أن ان إن التي الذي الذين هذا هذه ذلك تلك كان كانت يكون تكون قد لقد لم لن لا ما ماذا هل بعد قبل حتى عند بين خلال منذ حول ضد عبر أو او ثم كل بعض غير أي اي أكثر اكثر أول اول جديد جديدة جديدا يمكن تم يتم وفق وفقا بحسب حيث كما أيضا أيضًا الآن اليوم شركة".split(/\s+/),
+);
+
+function normalizeArabic(token: string): string {
+  let t = token
+    .replace(/[\u064B-\u0652\u0640]/g, "") // diacritics and tatweel
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه");
+  if (t.length > 4) t = t.replace(/^(وال|بال|كال|فال|لل|ال)/, "");
+  return t;
+}
+
 /** Content tokens of a headline (plus optional lead text) for similarity matching. */
 export function tokenize(text: string): string[] {
   const normalized = text
+    .replace(/[\u064B-\u0652\u0640]/g, "") // Arabic diacritics/tatweel would otherwise split words
     .toLowerCase()
     .replace(/[’']s\b/g, "")
     .replace(/(\w)[-.](\d)/g, "$1$2") // gpt-5 -> gpt5, m4.5 -> m45
     .replace(/[^\p{L}\p{N}\s]/gu, " ");
   const out: string[] = [];
   for (const raw of normalized.split(/\s+/)) {
-    if (!raw || raw.length < 2 || STOPWORDS.has(raw)) continue;
+    if (!raw || raw.length < 2 || STOPWORDS.has(raw) || AR_STOPWORDS.has(raw)) continue;
+    if (/[\u0600-\u06FF]/.test(raw)) {
+      const t = normalizeArabic(raw);
+      if (t.length >= 2 && !AR_STOPWORDS.has(t)) out.push(t);
+      continue;
+    }
     out.push(stem(raw));
   }
   return [...new Set(out)];

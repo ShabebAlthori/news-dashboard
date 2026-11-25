@@ -63,7 +63,7 @@ export function SearchView() {
         />
       </form>
       <p className="mb-5 text-sm text-muted">{t("search.hint", { n: prefs?.retentionDays ?? 30 })}</p>
-      <StoryFeed section="all" defaultSort="importance" defaultRange="all" categorySections={["tech", "gaming"]} showCompanyFilter requireQuery />
+      <StoryFeed section="all" defaultSort="importance" defaultRange="all" priorityChips showCompanyFilter requireQuery />
     </>
   );
 }

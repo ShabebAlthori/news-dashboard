@@ -119,38 +119,108 @@ const CLICKBAIT_SOFT =
   /\b(here'?s why|here'?s how|this is why|the reason why|you should|insane|crazy|wild|slams|roasts|destroys|blasts|claps back|drama|outrage|meltdown|furious|epic fail|bizarre)\b/i;
 
 const SPONSORED = /\b(sponsored|partner content|advertorial|paid (post|content)|in partnership with|presented by|brought to you by)\b/i;
+/** Publishers promoting their own events. */
+const PROMO = /\b(techcrunch (disrupt|sessions|founder summit|mobility|all stage)|founder summit|doors open|tickets?|register now|early[- ]bird|last chance to|days? (left|till|until)\b|call for speakers)\b/i;
 
 const ROUNDUP =
   /\b(podcast|episode \d+|weekly (recap|roundup|digest)|this week in|week in review|news roundup|the week'?s biggest|newsletter|live ?blog|live updates|recap:|morning (brief|digest)|daily digest|what we'?re (playing|reading|watching))\b/i;
 
 // ---------------------------------------------------------------------------
+// Arabic patterns. JavaScript's \b only knows Latin letters, so Arabic words are matched
+// at an Arabic word start, allowing the attached prefixes و ف ب ل ك and the article ال.
+
+const AR_LETTER = "\\u0600-\\u06FF";
+function ar(words: string): RegExp {
+  return new RegExp(`(?<![${AR_LETTER}])(?:[وفبلك]|ال|لل|وال|بال)?(?:${words})`, "u");
+}
+
+const AR_DEALS = ar("عروض|خصومات|خصم \\d|تخفيضات|كوبون|كود خصم|الجمعة البيضاء|بلاك فرايدي|الجمعة السوداء|بأقل سعر|أفضل العروض|سعر مخفض");
+const AR_GUIDES = ar("كيفية|كيف تقوم|كيف تستخدم|كيف تحمي|كيف تعرف|طريقة|خطوات|شرح|دليلك|دليل شامل|حيلة|حيل");
+const AR_POLITICS = ar("انتخابات|الانتخابات|حرب|غزة|حماس|حزب الله|الحوثي|حوثي|صاروخ|صواريخ|قصف|غارة|غارات|عسكري|عسكرية|جيش|البرلمان|الكونغرس|ترامب|بايدن|بوتين|نتنياهو|زيلينسكي|وقف إطلاق النار|أوكرانيا|روسيا");
+const AR_SPORTS = ar("كرة القدم|كرة قدم|دوري روشن|الدوري السعودي|دوري أبطال|كأس العالم|المنتخب|مباراة|مباريات|فورمولا|الفورمولا|الهلال|النصر|ريال مدريد|برشلونة|ميسي|رونالدو");
+const AR_ENTERTAINMENT = ar("فيلم|أفلام|مسلسل|مسلسلات|شباك التذاكر|ممثل|ممثلة|حفل غنائي|ألبوم|أغنية|موسيقى");
+const AR_CELEBRITY = ar("مشاهير|فنانة|زواج|طلاق|نجمة|نجم هوليوود");
+const AR_CLICKBAIT_STRONG = ar("لن تصدق|صادم|فضيحة|انتشر بشكل واسع");
+const AR_CLICKBAIT_SOFT = ar("إليك|تعرف على|مفاجأة|ما السر|هل تعلم");
+const AR_GAMING_ANCHOR = ar("لعبة|ألعاب|الألعاب|بلايستيشن|إكس بوكس|اكس بوكس|نينتندو|ستيم|منصة ألعاب|لاعبين|اللاعبين");
+const AR_REVIEW = ar("مراجعة|تجربتنا|تجربة استخدام|انطباعات أولية");
+const AR_RUMOR = ar("تسريب|تسريبات|شائعة|شائعات|تقارير تشير|بحسب تقارير|وفقًا لتقارير|وفقا لتقارير|يُتوقع|يتوقع|تعتزم|يعتزم|تخطط|يخطط|تدرس|يدرس|قد تطلق|قد يطلق");
+
+const AR_EVENT_RULES: { type: EventType; re: RegExp; base: number }[] = [
+  { type: "acquisition", base: 0.86, re: ar("تستحوذ|يستحوذ|استحواذ|اندماج|صفقة شراء") },
+  { type: "earnings", base: 0.72, re: ar("نتائج مالية|النتائج المالية|أرباح|إيرادات|الربع الأول|الربع الثاني|الربع الثالث|الربع الرابع|نتائج الربع") },
+  { type: "layoffs", base: 0.78, re: ar("تسريح|يسرح|تسرح|الاستغناء عن|خفض الوظائف|إعادة هيكلة") },
+  { type: "leadership", base: 0.8, re: ar("رئيسًا تنفيذيًا|رئيسا تنفيذيا|رئيس تنفيذي جديد|يستقيل|تستقيل|استقالة|يتنحى|يتولى منصب|تعيين رئيس") },
+  { type: "security-incident", base: 0.62, re: ar("اختراق|ثغرة|ثغرات|هجوم إلكتروني|هجوم سيبراني|هجمات إلكترونية|تسريب بيانات|برمجية خبيثة|برمجيات خبيثة|برنامج فدية|قراصنة|احتيال إلكتروني") },
+  { type: "outage", base: 0.6, re: ar("انقطاع|عطل واسع|توقف خدمة|توقف خدمات") },
+  { type: "regulation", base: 0.62, re: ar("دعوى|محكمة|غرامة|تغريم|حظر|مكافحة الاحتكار|الجهات التنظيمية|تحقيق رسمي|قانون جديد|تشريع") },
+  { type: "funding", base: 0.5, re: ar("تجمع|يجمع|جمعت|جولة تمويلية|جولة تمويل|جولة استثمارية|تمويلًا|تمويلا|صندوق استثماري|صندوق جريء") },
+  { type: "partnership", base: 0.56, re: ar("شراكة|تتعاون|يتعاون|اتفاقية|مذكرة تفاهم|تحالف") },
+  { type: "pricing", base: 0.58, re: ar("ترفع أسعار|رفع أسعار|تخفض أسعار|خفض أسعار|زيادة أسعار") },
+  { type: "delay", base: 0.56, re: ar("تأجيل|تؤجل|يؤجل|إلغاء|تلغي|يلغي") },
+  { type: "launch", base: 0.54, re: ar("تطلق|يطلق|إطلاق|تكشف|يكشف|تعلن|يعلن|الإعلان عن|تقدم|يقدم|متاح الآن|تتيح|يتيح|تطرح|يطرح|تدشن|يدشن") },
+  { type: "update", base: 0.35, re: ar("تحديث|الإصدار التجريبي|يختبر|تختبر|ميزة جديدة|مزايا جديدة") },
+];
+
+/** Startup-ecosystem news (funding rounds, VC funds, accelerators), in English and Arabic. */
+const STARTUP_SIGNAL =
+  /\b(startups?|fintech|proptech|healthtech|edtech|insurtech|bnpl|vc fund|venture (capital|fund|firm)|series [a-f]|pre-seed|seed (round|funding)|accelerator|incubator|unicorn|raises \$[\d.]+ ?(m|million|b|billion|bn)\b|secures \$[\d.]+ ?(m|million|b|billion|bn)\b|lands \$[\d.]+ ?(m|million|b|billion|bn)\b)/i;
+const AR_STARTUP_SIGNAL = ar("شركة ناشئة|شركات ناشئة|الشركات الناشئة|جولة تمويلية|جولة تمويل|جولة استثمارية|رأس المال الجريء|صندوق جريء|مسرعة أعمال|حاضنة أعمال");
+
+/** Saudi context, in English and Arabic. */
+const SAUDI_CONTEXT =
+  /\b(saudi|ksa|riyadh|jeddah|dammam|neom|vision 2030|public investment fund|pif|sdaia|humain|kaust|monsha'?at|tawakkalna|absher|leap 20\d\d|stc group|aramco digital|tamara|tabby|salla|foodics|jahez|mozn|unifonic|rewaa|lean technologies|brkz|ninja retail)\b/i;
+const AR_SAUDI_CONTEXT = ar("السعودية|السعودي|سعودي|سعودية|المملكة|الرياض|جدة|الدمام|نيوم|رؤية 2030|سدايا|صندوق الاستثمارات العامة|توكلنا|أبشر|منشآت|كاوست|هيوماين|أرامكو|موبايلي|زين السعودية|stc");
+/** Something that makes a Saudi story a technology or startup story. */
+const TECH_OR_STARTUP =
+  /\b(startups?|funding|raises?|raised|venture|vc|fintech|bnpl|payments?|digiti[sz]\w*|proptech|marketplace|valuation|financing|app|apps|platform|digital|ai|artificial intelligence|technology|tech|data|cloud|5g|telecom|e-?commerce|software|cyber\w*|semiconductors?|chips?|robots?|gaming|esports|games?|satellite|innovation|accelerator|incubator|unicorn|series [a-f]|pre-seed|seed round)\b/i;
+const AR_TECH_OR_STARTUP = ar("شركة ناشئة|الشركات الناشئة|ناشئة|تمويل|جولة|استثمار جريء|رأس المال الجريء|منصة|تطبيق|رقمي|رقمية|تقنية|تقني|التقنية|ذكاء اصطناعي|اتصالات|تجارة إلكترونية|سحابية|حوسبة|بيانات|أمن سيبراني|روبوت|ألعاب|ابتكار|مسرعة أعمال|حاضنة");
+
+// ---------------------------------------------------------------------------
 // Topic patterns (categories)
 
 const CATEGORY_PATTERNS: Record<string, RegExp[]> = {
+  data: [
+    /\b(data scien\w*|data analytics|analytics|data analysts?|data engineer\w*|big data|data warehous\w*|data lakes?|lakehouses?|data pipelines?|etl|business intelligence|bi tools?|sql|postgres\w*|mysql|(vector|graph|analytical|cloud|open[- ]source|distributed|time[- ]series) databases?|database (engines?|platforms?|vendors?|startups?|systems?|company|market)|duckdb|polars|pandas|jupyter|kaggle|datasets?|snowflake|databricks|bigquery|redshift|tableau|power bi|looker|dbt|apache spark|apache iceberg|iceberg tables?|kafka|vector databases?|data platforms?|data governance|data catalogs?|predictive analytics|data visuali[sz]ation|time series|feature stores?|data quality|data mesh|regression models?|regression|statistic(s|al)|bayesian|a\/b test\w*)\b/i,
+    ar("علم البيانات|علوم البيانات|تحليل البيانات|تحليلات|البيانات الضخمة|قواعد البيانات|قاعدة بيانات|مستودع بيانات|هندسة البيانات|ذكاء الأعمال|مجموعة بيانات|مجموعات بيانات"),
+  ],
+  robotics: [
+    /\b(robots?|robotics?|robotic|humanoids?|cobots?|robot arms?|robotic arms?|boston dynamics|figure ai|optimus|unitree|agility robotics|apptronik|1x technologies|robotaxis?|self-driving|driverless|autonomous (vehicles?|driving|trucks?|robots?)|drones?|quadrupeds?|exoskeletons?|warehouse automation|industrial automation)\b/i,
+    ar("روبوت|روبوتات|روبوتية|إنسان آلي|طائرة مسيرة|طائرات مسيرة|طائرة بدون طيار|درون|ذاتية القيادة|سيارات ذاتية|أتمتة صناعية"),
+  ],
+  saudi: [SAUDI_CONTEXT, AR_SAUDI_CONTEXT],
   ai: [
     /\b(ai|a\.i\.|artificial intelligence|machine learning|deep learning|llms?|large language models?|chatbots?|chatgpt|gpt-?\d|gemini|claude|copilot|openai|anthropic|deepmind|generative|gen ?ai|neural|agentic|ai agents?|inference|frontier models?|reasoning models?|sora|llama \d|mistral|xai|grok|deepseek|qwen|midjourney|stable diffusion|superintelligence|agi)\b/i,
+    ar("ذكاء اصطناعي|الذكاء الاصطناعي|نموذج لغوي|نماذج لغوية|روبوت محادثة|روبوتات الدردشة|تعلم آلي|التعلم الآلي|التعلم العميق|وكيل ذكي|وكلاء الذكاء|وكيل ذكاء|توليدي|التوليدي"),
   ],
   software: [
     /\b(apps?|software|browsers?|chrome|firefox|safari|microsoft office|office 365|microsoft 365|saas|cloud|aws|azure|google cloud|subscription service|whatsapp|instagram|youtube|spotify|messaging|search engine|email|productivity|photoshop|adobe|figma|slack|zoom|teams app|threads|bluesky|x\.com|social network|streaming app|web app)\b/i,
+    ar("تطبيق|تطبيقات|برنامج|برمجيات|متصفح|واتساب|إنستغرام|يوتيوب|تيك توك|منصة|خدمة جديدة"),
   ],
   security: [
     /\b(security|cybersecurity|cyber(?!punk)\w*|hack(s|ed|er|ers|ing)?|breach(es|ed)?|ransomware|malware|vulnerabilit(y|ies)|zero-day|0-day|exploit(s|ed)?|cve-\d+|phishing|data (leak|breach|theft)|leaked data|spyware|backdoor|patch tuesday|botnets?|ddos|infostealers?|cyberattacks?|encryption|passkeys?|passwords?|threat actors?|apt\d+|shinyhunters|lazarus)\b/i,
+    ar("أمن سيبراني|الأمن السيبراني|اختراق|قراصنة|هجوم إلكتروني|هجمات إلكترونية|هجوم سيبراني|ثغرة|ثغرات|برمجيات خبيثة|برمجية خبيثة|فدية|تسريب بيانات|احتيال|تصيد|كلمات المرور|كلمة المرور|التشفير"),
   ],
   hardware: [
     /\b(gpus?|graphics cards?|geforce|rtx ?\d{3,4}|radeon|rx ?\d{4}|arc (a|b|c)\d{3}|motherboards?|ram|ddr[56]|ssds?|nvme|monitors?|laptops?|pc builds?|desktop pcs?|workstations?|vram|power supply|cpu coolers?|keyboards?|mini pcs?|graphics hardware|dgx|rtx spark)\b/i,
+    ar("معالج رسومي|معالجات رسومية|بطاقة رسومات|بطاقات الرسومات|بطاقة رسومية|حاسوب|حواسيب|الحاسب|لابتوب|حاسوب محمول|شاشة ألعاب|ذاكرة عشوائية|وحدة تخزين|لوحة أم"),
   ],
   chips: [
-    /\b(cpus?|processors?|chips?|chipsets?|semiconductors?|chipmakers?|ryzen|epyc|threadripper|core ultra|xeon|snapdragon|exynos|tensor g\d|apple m\d|m\d (pro|max|ultra)|a\d{2} (bionic|pro)|tsmc|foundry|foundries|wafers?|[0-9]+ ?nm|18a|14a|risc-v|npus?|tpus?|hbm\d?|blackwell|rubin|grace hopper|nvlink|fabs?|lithography|asml|silicon)\b/i,
+    /\b(cpus?|processors?|chips?|chipsets?|semiconductors?|chipmakers?|ryzen|epyc|threadripper|core ultra|xeon|snapdragon|exynos|tensor g\d|apple m\d|m\d (pro|max|ultra)|a\d{2} (bionic|pro)|tsmc|foundry|foundries|wafers?|[0-9]+ ?nm|18a|14a|risc-v|npus?|tpus?|hbm\d?|blackwell|rubin|grace hopper|nvlink|fabs?|lithography|asml|custom silicon|silicon (chips?|wafers?|photonics|carbide))\b/i,
+    ar("معالج|معالجات|رقاقة|رقاقات|رقائق|أشباه الموصلات|شرائح|شريحة|مصنع رقائق"),
   ],
   mobile: [
     /\b(smartphones?|phones?|iphone|pixel \d+|pixel (watch|buds|fold|tablet)|galaxy|android phones?|ipad|tablets?|wearables?|smartwatch(es)?|apple watch|airpods|earbuds|headphones|foldables?|oneplus|xiaomi|vision pro|quest \d|vr headsets?|ar glasses|smart glasses|ray-ban meta|e-readers?|kindle|consumer electronics|smart home|smart tv|wearable)\b/i,
+    ar("هاتف|هواتف|جوال|آيفون|ايفون|جالاكسي|غالاكسي|ساعة ذكية|ساعات ذكية|سماعات|جهاز لوحي|أجهزة لوحية|آيباد|نظارات ذكية|نظارة ذكية|شحن سريع|بطارية"),
   ],
   os: [
     /\b(windows (10|11|12)|windows|macos|ios \d+|ios|ipados|watchos|visionos|android \d+|android|linux|kernel|chromeos|operating systems?|wsl|steamos|harmonyos|ubuntu|fedora|debian)\b/,
     /\b(operating system|linux kernel)\b/i,
+    ar("نظام تشغيل|أنظمة التشغيل|نظام التشغيل|أندرويد|اندرويد|ويندوز|لينكس"),
   ],
   dev: [
     /\b(programming|programmers?|developers?|github|gitlab|git|apis?|sdks?|open[- ]source|python|javascript|typescript|rust|golang|kotlin|swift|compilers?|frameworks?|ides?|vs code|visual studio|coding|devops|kubernetes|docker|npm|pypi|repositor(y|ies)|llvm|webassembly|wasm|code review|software engineers?)\b/i,
+    ar("برمجة|البرمجة|مبرمج|مبرمجين|المطورين|مطوري|مفتوح المصدر|مفتوحة المصدر|المصادر المفتوحة|لغة برمجة|لغات البرمجة|شيفرة|الشيفرة البرمجية"),
   ],
   "pc-gaming": [
     /\b(pc games?|pc gaming|pc gamers?|on pc|pc port|pc version|steam|epic games store|gog|dlss|fsr|ray tracing|path tracing|mods?|modding|modders?|system requirements|pc release)\b/i,
@@ -181,6 +251,8 @@ const GAMING_ANCHOR =
 const OTHER_TECH_COMPANIES =
   /\b(huawei|xiaomi|lenovo|asus|acer|msi|dell|hp|hpe|cisco|ibm|oracle|salesforce|adobe|broadcom|micron|sk hynix|marvell|asml|globalfoundries|foxconn|supermicro|palantir|cloudflare|crowdstrike|palo alto networks|fortinet|okta|vmware|nutanix|rackspace|spotify|snap|reddit|pinterest|discord|telegram|signal app|proton|mozilla|wikipedia|perplexity|mistral|cohere|hugging face|databricks|snowflake|coreweave|cerebras|groq|figure ai|ubisoft|square enix|capcom|bandai namco|sega|krafton|nexon|netease|embracer|cd projekt|devolver|riot|bungie|blizzard|activision|bethesda|rockstar|gamestop|roblox|unity|niantic|razer|logitech|corsair|steelseries|nothing phone|oneplus|oppo|vivo|honor|motorola|garmin|sonos|dyson|starlink|spacex)\b/i;
 
+const AR_OTHER_TECH_COMPANIES = ar("هواوي|شاومي|لينوفو|أوبو|فيفو|ريلمي|ون بلس|ديل|سيسكو|أوراكل|أدوبي|تسلا|سبيس إكس|ستارلينك|علي بابا|بايدو|إس تي سي|موبايلي|زين|هيوماين|سدايا");
+
 // ---------------------------------------------------------------------------
 // Companies
 
@@ -190,30 +262,30 @@ interface CompanyPattern {
 }
 
 const COMPANY_PATTERNS: CompanyPattern[] = [
-  { id: "microsoft", patterns: [/\bMicrosoft\b/i, /\bXbox\b/i, /\bWindows (10|11|12|Server)\b/i, /\bAzure\b/i, /\bCopilot\b/, /\bSatya Nadella\b/i, /\bActivision\b/i, /\bBlizzard\b/i, /\bBethesda\b/i, /\bGitHub\b/i, /\bLinkedIn\b/, /\bMojang\b/i, /\bMinecraft\b/i] },
-  { id: "google", patterns: [/\bGoogle\b/i, /\bAlphabet\b/, /\bAndroid\b/, /\bGemini\b/, /\bDeepMind\b/i, /\bYouTube\b/i, /\bPixel \d+/i, /\bPixel (Watch|Buds|Fold|Tablet)\b/i, /\bChrome(OS)?\b/, /\bWaymo\b/i, /\bSundar Pichai\b/i, /\bTPUs?\b/] },
-  { id: "apple", patterns: [/\bApple\b/, /\biPhone/i, /\biPad/i, /\bMacBook/i, /\bmacOS\b/i, /\biOS \d+/, /\bwatchOS\b/i, /\bvisionOS\b/i, /\bVision Pro\b/i, /\bAirPods\b/i, /\bApple Watch\b/i, /\bTim Cook\b/i, /\bApple Intelligence\b/i] },
-  { id: "nvidia", patterns: [/\bNvidia\b/i, /\bGeForce\b/i, /\bRTX\b/, /\bDLSS\b/, /\bCUDA\b/, /\bJensen Huang\b/i, /\bBlackwell\b/, /\bVera Rubin\b/i, /\bDGX\b/] },
-  { id: "amd", patterns: [/\bAMD\b/, /\bRadeon\b/i, /\bRyzen\b/i, /\bEPYC\b/i, /\bThreadripper\b/i, /\bLisa Su\b/i, /\bInstinct MI\d+/i] },
-  { id: "intel", patterns: [/\bIntel\b/, /\bCore Ultra\b/i, /\bXeon\b/i, /\bArc (A|B|C)\d{3}\b/, /\bLip-Bu Tan\b/i, /\bGaudi \d\b/i, /\bIntel Foundry\b/i, /\bPanther Lake\b/i, /\bNova Lake\b/i] },
-  { id: "amazon", patterns: [/\bAmazon\b/, /\bAWS\b/, /\bAlexa\b/, /\bKindle\b/, /\bTwitch\b/, /\bAndy Jassy\b/i, /\bProject Kuiper\b/i, /\bAmazon Leo\b/i] },
-  { id: "meta", patterns: [/\bMeta\b(?![-\w])/, /\bFacebook\b/i, /\bInstagram\b/i, /\bWhatsApp\b/i, /\bMeta Quest\b/i, /\bQuest \d\b/, /\bOculus\b/i, /\bReality Labs\b/i, /\bZuckerberg\b/i, /\bLlama \d/, /\bRay-Ban Meta\b/i] },
-  { id: "openai", patterns: [/\bOpenAI\b/i, /\bChatGPT\b/i, /\bGPT-\d/i, /\bSam Altman\b/i, /\bSora\b/] },
-  { id: "anthropic", patterns: [/\bAnthropic\b/i, /\bClaude\b/, /\bDario Amodei\b/i] },
-  { id: "sony", patterns: [/\bSony\b/i, /\bPlayStation\b/i, /\bPS5\b/i, /\bPS6\b/i, /\bPS Plus\b/i, /\bPSVR ?2?\b/i, /\bBungie\b/i, /\bInsomniac\b/i, /\bNaughty Dog\b/i] },
-  { id: "samsung", patterns: [/\bSamsung\b/i, /\bGalaxy (S|Z|A|Tab|Watch|Buds|Ring|XR|Book|SmartTag)/i, /\bExynos\b/i, /\bOne UI\b/i] },
-  { id: "qualcomm", patterns: [/\bQualcomm\b/i, /\bSnapdragon\b/i, /\bCristiano Amon\b/i] },
-  { id: "valve", patterns: [/\bValve\b/, /\bSteam\b/, /\bSteamOS\b/i, /\bGabe Newell\b/i, /\bHalf-Life\b/i, /\bCounter-Strike\b/i, /\bDota 2\b/i] },
-  { id: "tencent", patterns: [/\bTencent\b/i, /\bWeChat\b/i, /\bRiot Games\b/i, /\bHonor of Kings\b/i, /\bTiMi\b/] },
-  { id: "nintendo", patterns: [/\bNintendo\b/i, /\bSwitch 2\b/i, /\bSuper Mario\b/i, /\bZelda\b/i, /\bPok[eé]mon\b/i, /\bShuntaro Furukawa\b/i] },
-  { id: "ea", patterns: [/\bElectronic Arts\b/i, /\bEA\b/, /\bEA Sports\b/i, /\bBattlefield\b/i, /\bApex Legends\b/i, /\bThe Sims\b/i, /\bBioWare\b/i, /\bRespawn\b/i] },
-  { id: "take-two", patterns: [/\bTake-?Two\b/i, /\bRockstar\b/i, /\bGTA\b/, /\bGrand Theft Auto\b/i, /\b2K\b/, /\bStrauss Zelnick\b/i, /\bZynga\b/i, /\bGearbox\b/i] },
-  { id: "tsmc", patterns: [/\bTSMC\b/, /\bTaiwan Semiconductor\b/i] },
+  { id: "microsoft", patterns: [/\bMicrosoft\b/i, /\bXbox\b/i, /\bWindows (10|11|12|Server)\b/i, /\bAzure\b/i, /\bCopilot\b/, /\bSatya Nadella\b/i, /\bActivision\b/i, /\bBlizzard\b/i, /\bBethesda\b/i, /\bGitHub\b/i, /\bLinkedIn\b/, /\bMojang\b/i, /\bMinecraft\b/i, ar("مايكروسوفت|إكس بوكس|اكس بوكس|أكس بوكس")] },
+  { id: "google", patterns: [/\bGoogle\b/i, /\bAlphabet\b/, /\bAndroid\b/, /\bGemini\b/, /\bDeepMind\b/i, /\bYouTube\b/i, /\bPixel \d+/i, /\bPixel (Watch|Buds|Fold|Tablet)\b/i, /\bChrome(OS)?\b/, /\bWaymo\b/i, /\bSundar Pichai\b/i, /\bTPUs?\b/, ar("جوجل|غوغل|ألفابت|أندرويد|اندرويد|جيميني|يوتيوب|بيكسل")] },
+  { id: "apple", patterns: [/\bApple\b/, /\biPhone/i, /\biPad/i, /\bMacBook/i, /\bmacOS\b/i, /\biOS \d+/, /\bwatchOS\b/i, /\bvisionOS\b/i, /\bVision Pro\b/i, /\bAirPods\b/i, /\bApple Watch\b/i, /\bTim Cook\b/i, /\bApple Intelligence\b/i, ar("آبل|أبل|آيفون|ايفون|آيباد|ايباد|ماك بوك|ساعة آبل")] },
+  { id: "nvidia", patterns: [/\bNvidia\b/i, /\bGeForce\b/i, /\bRTX\b/, /\bDLSS\b/, /\bCUDA\b/, /\bJensen Huang\b/i, /\bBlackwell\b/, /\bVera Rubin\b/i, /\bDGX\b/, ar("إنفيديا|انفيديا|نفيديا|جيفورس")] },
+  { id: "amd", patterns: [/\bAMD\b/, /\bRadeon\b/i, /\bRyzen\b/i, /\bEPYC\b/i, /\bThreadripper\b/i, /\bLisa Su\b/i, /\bInstinct MI\d+/i, ar("إيه إم دي|رايزن|راديون")] },
+  { id: "intel", patterns: [/\bIntel\b/, /\bCore Ultra\b/i, /\bXeon\b/i, /\bArc (A|B|C)\d{3}\b/, /\bLip-Bu Tan\b/i, /\bGaudi \d\b/i, /\bIntel Foundry\b/i, /\bPanther Lake\b/i, /\bNova Lake\b/i, ar("إنتل|انتل")] },
+  { id: "amazon", patterns: [/\bAmazon\b/, /\bAWS\b/, /\bAlexa\b/, /\bKindle\b/, /\bTwitch\b/, /\bAndy Jassy\b/i, /\bProject Kuiper\b/i, /\bAmazon Leo\b/i, ar("أمازون|امازون|أليكسا")] },
+  { id: "meta", patterns: [/\bMeta\b(?![-\w])/, /\bFacebook\b/i, /\bInstagram\b/i, /\bWhatsApp\b/i, /\bMeta Quest\b/i, /\bQuest \d\b/, /\bOculus\b/i, /\bReality Labs\b/i, /\bZuckerberg\b/i, /\bLlama \d/, /\bRay-Ban Meta\b/i, ar("ميتا|فيسبوك|فيس بوك|إنستغرام|انستغرام|إنستجرام|واتساب|واتس اب|زوكربيرج")] },
+  { id: "openai", patterns: [/\bOpenAI\b/i, /\bChatGPT\b/i, /\bGPT-\d/i, /\bSam Altman\b/i, /\bSora\b/, ar("أوبن إيه آي|شات جي بي تي")] },
+  { id: "anthropic", patterns: [/\bAnthropic\b/i, /\bClaude\b/, /\bDario Amodei\b/i, ar("أنثروبيك|انثروبيك")] },
+  { id: "sony", patterns: [/\bSony\b/i, /\bPlayStation\b/i, /\bPS5\b/i, /\bPS6\b/i, /\bPS Plus\b/i, /\bPSVR ?2?\b/i, /\bBungie\b/i, /\bInsomniac\b/i, /\bNaughty Dog\b/i, ar("سوني|بلايستيشن|بلاي ستيشن")] },
+  { id: "samsung", patterns: [/\bSamsung\b/i, /\bGalaxy (S|Z|A|Tab|Watch|Buds|Ring|XR|Book|SmartTag)/i, /\bExynos\b/i, /\bOne UI\b/i, ar("سامسونج|سامسونغ|جالاكسي|غالاكسي")] },
+  { id: "qualcomm", patterns: [/\bQualcomm\b/i, /\bSnapdragon\b/i, /\bCristiano Amon\b/i, ar("كوالكوم|سنابدراغون|سناب دراغون")] },
+  { id: "valve", patterns: [/\bValve\b/, /\bSteam\b/, /\bSteamOS\b/i, /\bGabe Newell\b/i, /\bHalf-Life\b/i, /\bCounter-Strike\b/i, /\bDota 2\b/i, ar("فالف|ستيم ديك")] },
+  { id: "tencent", patterns: [/\bTencent\b/i, /\bWeChat\b/i, /\bRiot Games\b/i, /\bHonor of Kings\b/i, /\bTiMi\b/, ar("تينسنت|تنسنت")] },
+  { id: "nintendo", patterns: [/\bNintendo\b/i, /\bSwitch 2\b/i, /\bSuper Mario\b/i, /\bZelda\b/i, /\bPok[eé]mon\b/i, /\bShuntaro Furukawa\b/i, ar("نينتندو|نينتيندو")] },
+  { id: "ea", patterns: [/\bElectronic Arts\b/i, /\bEA\b/, /\bEA Sports\b/i, /\bBattlefield\b/i, /\bApex Legends\b/i, /\bThe Sims\b/i, /\bBioWare\b/i, /\bRespawn\b/i, ar("إلكترونيك آرتس|إي إيه")] },
+  { id: "take-two", patterns: [/\bTake-?Two\b/i, /\bRockstar\b/i, /\bGTA\b/, /\bGrand Theft Auto\b/i, /\b2K\b/, /\bStrauss Zelnick\b/i, /\bZynga\b/i, /\bGearbox\b/i, ar("روكستار|تيك تو")] },
+  { id: "tsmc", patterns: [/\bTSMC\b/, /\bTaiwan Semiconductor\b/i, ar("تي إس إم سي")] },
   { id: "arm", patterns: [/\bArm Holdings\b/i, /\bArm\b(?= (chips?|cores?|architecture|-based|CEO|designs?|licen[cs]))/, /\bRene Haas\b/i] },
-  { id: "xai", patterns: [/\bxAI\b/, /\bGrok\b/] },
-  { id: "bytedance", patterns: [/\bByteDance\b/i, /\bTikTok\b/i] },
-  { id: "epic", patterns: [/\bEpic Games\b/i, /\bFortnite\b/i, /\bUnreal Engine\b/i, /\bTim Sweeney\b/i] },
-  { id: "ubisoft", patterns: [/\bUbisoft\b/i, /\bAssassin'?s Creed\b/i] },
+  { id: "xai", patterns: [/\bxAI\b/, /\bGrok\b/, ar("غروك")] },
+  { id: "bytedance", patterns: [/\bByteDance\b/i, /\bTikTok\b/i, ar("بايت دانس|تيك توك")] },
+  { id: "epic", patterns: [/\bEpic Games\b/i, /\bFortnite\b/i, /\bUnreal Engine\b/i, /\bTim Sweeney\b/i, ar("إيبك جيمز|فورتنايت")] },
+  { id: "ubisoft", patterns: [/\bUbisoft\b/i, /\bAssassin'?s Creed\b/i, ar("يوبيسوفت")] },
 ];
 
 export function detectCompanies(title: string, text: string): { all: string[]; inTitle: string[] } {
@@ -238,12 +310,12 @@ export function detectCompanies(title: string, text: string): { all: string[]; i
 
 const EVENT_RULES: { type: EventType; re: RegExp; base: number }[] = [
   { type: "acquisition", base: 0.86, re: /\b(acquir(e|es|ed|ing)|acquisition|buyout|takeover of|takes over|mergers?|merges? with|to merge with|snaps up|purchase of|deal to buy|agrees to buy|to buy [A-Z]|buys [A-Z]|completes? (its )?(\$[\d.]+ ?[mb]illion )?(purchase|deal|acquisition))\b/ },
-  { type: "earnings", base: 0.72, re: /\b(earnings|quarterly (results|revenue|profit|sales)|q[1-4] (results|earnings|revenue|sales)|fiscal (q[1-4]|year|quarter)|(first|second|third|fourth)[- ]quarter|revenue (rises|falls|jumps|grows|surges|drops|beats|misses|climbs|soars)|beats (estimates|expectations)|misses (estimates|expectations)|profits? (rises?|falls?|jumps?|surges?|drops?|warning|plunges?)|guidance|record revenue|annual results|financial results)\b/i },
+  { type: "earnings", base: 0.72, re: /\b(earnings|quarterly (results|revenue|profit|sales)|q[1-4] (results|earnings|revenue|sales)|fiscal (q[1-4]|year|quarter)|(first|second|third|fourth)[- ]quarter|revenue (rises|falls|jumps|grows|surges|drops|beats|misses|climbs|soars)|beats (estimates|expectations|(q[1-4] )?forecasts)|misses (estimates|expectations|(q[1-4] )?forecasts)|profits? (rises?|falls?|jumps?|surges?|drops?|warning|plunges?)|guidance|record revenue|annual results|financial results)\b/i },
   { type: "layoffs", base: 0.78, re: /\b(layoffs?|lay(s|ing)? off|laid off|job cuts?|cuts? (\d[\d,]* )?(jobs|roles|staff|workers|employees)|cutting jobs|redundanc(y|ies)|restructur\w*|workforce reduction|downsiz\w*|merges (two|its|their|several)|studio closures?|clos(es|ing|ed) (the |its )?studios?|shut(s|ting)? down (the |its )?(studio|team|division))\b/i },
   { type: "leadership", base: 0.8, re: /\b((new|interim) (ceo|cfo|cto|chief executive)|(ceo|cfo|cto|chief executive|president|chair\w*|head of \w+|founder|boss) (steps down|resigns|retires|exits|departs|leaves|is out|ousted|fired|to step down|to retire|to leave)|steps? down as|stepping down|resign(s|ed)? as|appoint(s|ed)? .{0,40}(ceo|cfo|cto|chief|president|head)|names? .{0,40}(new )?(ceo|cfo|cto|chief executive|president)|succeed(s|ed)? .{0,30} as (ceo|chief)|leadership (change|shake-?up|transition)|gradual departure|successor|reinstat\w+ .{0,40}(as )?(ceo|chief executive)|new leadership|leadership team|returns? as (ceo|chief executive)|back as (ceo|chief executive))\b/i },
   { type: "security-incident", base: 0.62, re: /\b(breach(ed|es)?|hack(ed|ers?)|ransomware|zero-day|0-day|actively exploited|exploited|cyberattacks?|cyber-attacks?|data (leak|theft|stolen)|stole(n)? data|data stolen|malware|spyware|backdoor(ed)?|botnet|ddos|compromised|supply[- ]chain attack|critical (vulnerabilit\w+|flaws?|bugs?|patch\w*|vulns?)|vulnerabilit(y|ies)|security (flaw|bug|hole|incident)|cybersecurity incident|cve-\d+|infostealer|phishing|threat actors?)\b/i },
   { type: "outage", base: 0.6, re: /\b(outages?|went down|goes down|is down|services? (restored|disrupted)|disruption|downtime|knocked offline)\b/i },
-  { type: "regulation", base: 0.62, re: /\b(antitrust|lawsuit|sues?|sued|suing|court|judge|ruling|rules? (that|against|in favor)|verdict|settle(s|d|ment)|fine[sd]?\b|penalt(y|ies)|regulators?|ftc|doj|european commission|competition (and markets )?authority|cma|dma|digital markets act|ban on|banned (in|by|from (the )?(us|eu|uk|china))|bans? (sales|imports|exports|the use|use of)|probe|investigation|class action|export (controls?|restrictions?|rules?|licen[cs]es?)|tariffs?|chips act|legislation)\b/i },
+  { type: "regulation", base: 0.62, re: /\b(antitrust|lawsuit|sues?|sued|suing|court|federal judge|judge (rules|ruled|orders|ordered|blocks|blocked|grants|denies|dismisses|sides)|ruling|rules? (that|against|in favor)|verdict|settle(s|d|ment)|fine[sd]?\b(?![-‐])|penalt(y|ies)|regulators?|ftc|doj|european commission|competition (and markets )?authority|cma|dma|digital markets act|ban on|banned (in|by|from (the )?(us|eu|uk|china))|bans? (sales|imports|exports|the use|use of)|probe|investigation|class action|export (controls?|restrictions?|rules?|licen[cs]es?)|tariffs?|chips act|legislation)\b/i },
   { type: "funding", base: 0.5, re: /\b(raises? \$|raised \$|funding round|series [a-f]\b|seed round|valuation|valued at|ipo\b|goes public|public offering|spac)\b/i },
   { type: "partnership", base: 0.56, re: /\b(partner(s|ship|ing)? with|partnership|teams? up|collaborat\w+|alliance|joint venture|strikes? (a )?deal|signs? (a )?deal|multi-?year (deal|agreement)|agreement with|deal with|invest(s|ing|ment)? \$?[\d.]+ ?(billion|bn|million)|to invest|commits? \$|\$[\d.]+ ?(billion|bn) (deal|investment|contract)|expand(s|ed)? .{0,30} (partnership|collaboration))\b/i },
   { type: "pricing", base: 0.58, re: /\b(price (increase|hike|cut|change)s?|raises? (the )?prices?|prices? (rise|go up|increase|hike)|cuts? (the )?price|more expensive|subscription (price|cost)s?|priced at \$|now costs?)\b/i },
@@ -305,20 +377,20 @@ export function classify(input: ClassifyInput): Classification {
 
   // ---- 1. Hard exclusions (title-driven, explainable)
   if (any(PUZZLES, title)) return result("puzzles");
-  if (any(SPONSORED, title) || /\b(sponsored|partner content)\b/i.test(feedCats)) return result("sponsored");
-  if (any(DEALS, title)) return result("deals");
-  if (any(GUIDES, title)) return result("guides");
+  if (any(SPONSORED, title) || any(PROMO, title) || /\b(sponsored|partner content)\b/i.test(feedCats)) return result("sponsored");
+  if (any(DEALS, title) || any(AR_DEALS, title)) return result("deals");
+  if (any(GUIDES, title) || any(AR_GUIDES, title)) return result("guides");
   if (any(ROUNDUP, title)) return result("roundup");
-  if (any(CLICKBAIT_STRONG, title)) return result("clickbait");
+  if (any(CLICKBAIT_STRONG, title) || any(AR_CLICKBAIT_STRONG, title)) return result("clickbait");
 
-  const gamingAnchor = any(GAMING_ANCHOR, title.replace(/\b(olympic|commonwealth|asian|paralympic) games\b/gi, ""));
+  const gamingAnchor = any(GAMING_ANCHOR, title.replace(/\b(olympic|commonwealth|asian|paralympic) games\b/gi, "")) || any(AR_GAMING_ANCHOR, title);
   const hasCompanyAnchor = titleCompanies.length > 0;
 
-  if (any(CELEBRITY, title)) return result("celebrity");
+  if (any(CELEBRITY, title) || any(AR_CELEBRITY, title)) return result("celebrity");
 
   // Sports — but not sports video games (EA Sports FC, Madden, NBA 2K…)
   const securityStory = /\b(hack(ed|ers?)|breach(ed|es)?|data (leak|theft|stolen)|stole|ransomware|cyberattack)\b/i.test(title);
-  const sportsHit = any(SPORTS_STRONG, title) || (input.source.section !== "gaming" && any(SPORTS_WEAK, title));
+  const sportsHit = any(SPORTS_STRONG, title) || any(AR_SPORTS, title) || (input.source.section !== "gaming" && any(SPORTS_WEAK, title));
   if (sportsHit && !any(VIDEO_GAME_SPORTS, title) && !gamingAnchor && !securityStory) return result("sports");
   // Esports: keep business developments, drop match results.
   if (any(ESPORTS, title) && any(ESPORTS_RESULTS, title) && !any(ESPORTS_BUSINESS, titleAndHead)) return result("sports");
@@ -327,7 +399,7 @@ export function classify(input: ClassifyInput): Classification {
   const entertainmentFeedCat =
     input.source.section !== "gaming" && input.feedCategories.some((c) => ENTERTAINMENT_FEED_CATEGORY.test(c.trim()));
   if (STRONG_ENTERTAINMENT.test(title) && !/\b(acquir\w*|merger|earnings|layoffs?|lays off)\b/i.test(title)) return result("entertainment");
-  if ((any(ENTERTAINMENT, title) || (entertainmentFeedCat && !gamingAnchor)) && !gamingAnchor) {
+  if ((any(ENTERTAINMENT, title) || any(AR_ENTERTAINMENT, title) || (entertainmentFeedCat && !gamingAnchor)) && !gamingAnchor) {
     const businessAnchored = hasCompanyAnchor && /\b(acquir|merger|earnings|layoffs?|lays off|revenue|stake)\w*/i.test(title);
     if (!businessAnchored) return result("entertainment");
   }
@@ -335,11 +407,14 @@ export function classify(input: ClassifyInput): Classification {
   // Politics — strict. Hard political topics are always excluded. Soft political
   // context is kept only for tech regulation that directly involves tech/gaming.
   let policy = false;
+  // Saudi government technology initiatives (SDAIA, ministries, PIF…) are tech news, not politics.
+  const saudiTech = (SAUDI_CONTEXT.test(titleAndHead) || AR_SAUDI_CONTEXT.test(titleAndHead)) && (TECH_OR_STARTUP.test(title) || AR_TECH_OR_STARTUP.test(title));
   if (HARD_POLITICS.some((re) => re.test(title))) return result("politics");
+  if (any(AR_POLITICS, title) && !securityStory) return result("politics");
   if (CONFLICT.test(title) && !securityStory && !hasCompanyAnchor) return result("politics");
   const politicianInTitle = any(POLITICIANS, title);
   const softInTitle = any(SOFT_POLITICS, title) || politicianInTitle;
-  if (softInTitle) {
+  if (softInTitle && !saudiTech) {
     const regulation = any(REGULATION_CONTEXT, title);
     const techTopic = hasCompanyAnchor || any(TECH_POLICY_TOPIC, title);
     if (regulation && techTopic && (!politicianInTitle || hasCompanyAnchor)) policy = true;
@@ -367,14 +442,20 @@ export function classify(input: ClassifyInput): Classification {
   // "releases" is very generic: only keep it in a gaming context with a title hit.
   if ((scores.get("releases") ?? 0) < 3) scores.delete("releases");
 
+  // "Saudi" alone is not enough: the story must also be about technology or startups.
+  // (A Saudi person or place mentioned in an unrelated story does not count.)
+  if (scores.has("saudi") && !saudiTech) scores.delete("saudi");
+
   let categories = [...scores.entries()]
     .filter(([, s]) => s >= 3)
     .sort((a, b) => b[1] - a[1])
     .map(([c]) => c)
     .slice(0, 3);
+  // Keep the Saudi tag even when other topics score higher.
+  if ((scores.get("saudi") ?? 0) >= 3 && !categories.includes("saudi")) categories = [...categories.slice(0, 2), "saudi"];
 
   // ---- 3. Event type & significance
-  const isReview = any(REVIEW, title);
+  const isReview = any(REVIEW, title) || any(AR_REVIEW, title);
   const isOpinion = !isReview && any(OPINION, title);
   let eventType: EventType = "general";
   let significance = 0.4;
@@ -390,6 +471,15 @@ export function classify(input: ClassifyInput): Classification {
         eventType = rule.type;
         significance = rule.base;
         break;
+      }
+    }
+    if (eventType === "general") {
+      for (const rule of AR_EVENT_RULES) {
+        if (rule.re.test(title)) {
+          eventType = rule.type;
+          significance = rule.base;
+          break;
+        }
       }
     }
   }
@@ -416,12 +506,12 @@ export function classify(input: ClassifyInput): Classification {
   }, 0);
   significance += tierBoost;
 
-  const rumor = any(RUMOR, title);
+  const rumor = any(RUMOR, title) || any(AR_RUMOR, title);
   if (rumor) significance *= 0.82;
 
   let clickbaitPenalty = 0;
-  if (any(CLICKBAIT_SOFT, title)) clickbaitPenalty += 0.5;
-  if (/\?\s*$/.test(title)) clickbaitPenalty += 0.3;
+  if (any(CLICKBAIT_SOFT, title) || any(AR_CLICKBAIT_SOFT, title)) clickbaitPenalty += 0.5;
+  if (/[?؟]\s*$/.test(title)) clickbaitPenalty += 0.3;
   if (/^\d+ (things|reasons|ways|games|apps)\b/i.test(title)) clickbaitPenalty += 0.4;
   if (/\b(best|top) \d+\b/i.test(title)) clickbaitPenalty += 0.4;
   clickbaitPenalty = Math.min(1, clickbaitPenalty);
@@ -446,6 +536,12 @@ export function classify(input: ClassifyInput): Classification {
     else if (eventType === "launch" && hasCompanyAnchor) categories = [...categories, "products"];
   }
 
+  // Startup-ecosystem news counts as business even without a tracked company.
+  const startupNews = any(STARTUP_SIGNAL, titleAndHead) || any(AR_STARTUP_SIGNAL, titleAndHead);
+  if (startupNews && (businessEvent || any(STARTUP_SIGNAL, title) || any(AR_STARTUP_SIGNAL, title)) && !categories.includes("strategy")) {
+    categories = [...categories, "strategy"];
+  }
+
   // ---- 5. Sections
   const sections = new Set<Section>();
   for (const c of categories) {
@@ -461,7 +557,7 @@ export function classify(input: ClassifyInput): Classification {
   }
 
   // ---- 6. Off-topic: nothing connects the story to tech, gaming or a tracked company.
-  const otherTechAnchor = any(OTHER_TECH_COMPANIES, title);
+  const otherTechAnchor = any(OTHER_TECH_COMPANIES, title) || any(AR_OTHER_TECH_COMPANIES, title);
   if (otherTechAnchor && sections.size === 0) sections.add(gamingContext && input.source.section === "gaming" ? "gaming" : "tech");
   if (otherTechAnchor && businessEvent) sections.add("business");
   const onTopic =

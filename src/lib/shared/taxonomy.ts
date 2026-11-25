@@ -16,16 +16,23 @@ export const SECTIONS: { id: Section; en: string; ar: string }[] = [
   { id: "business", en: "Companies & Business", ar: "الشركات والأعمال" },
 ];
 
+/**
+ * Fine-grained topics. Articles are tagged with these ids (stored in the database), and
+ * each topic belongs to one of the reader's priority categories below.
+ */
 export const CATEGORIES: CategoryDef[] = [
   // Technology
-  { id: "ai", section: "tech", en: "Artificial Intelligence", ar: "الذكاء الاصطناعي" },
-  { id: "software", section: "tech", en: "Software & Apps", ar: "البرمجيات والتطبيقات" },
-  { id: "security", section: "tech", en: "Cybersecurity", ar: "الأمن السيبراني" },
+  { id: "data", section: "tech", en: "Data Science & Analytics", ar: "علم البيانات والتحليلات" },
+  { id: "ai", section: "tech", en: "AI & Artificial Intelligence", ar: "الذكاء الاصطناعي" },
+  { id: "dev", section: "tech", en: "Programming & Open Source", ar: "البرمجة والمصادر المفتوحة" },
+  { id: "security", section: "tech", en: "Cybersecurity & Hacking", ar: "الأمن السيبراني والاختراق" },
   { id: "hardware", section: "tech", en: "PC Hardware & GPUs", ar: "عتاد الحاسوب وبطاقات الرسوميات" },
   { id: "chips", section: "tech", en: "CPUs & Semiconductors", ar: "المعالجات وأشباه الموصلات" },
+  { id: "saudi", section: "tech", en: "Saudi Technology & Startups", ar: "التقنية والشركات الناشئة في السعودية" },
+  { id: "robotics", section: "tech", en: "Robotics", ar: "الروبوتات" },
+  { id: "software", section: "tech", en: "Software & Apps", ar: "البرمجيات والتطبيقات" },
   { id: "mobile", section: "tech", en: "Phones & Consumer Electronics", ar: "الهواتف والإلكترونيات الاستهلاكية" },
   { id: "os", section: "tech", en: "Operating Systems", ar: "أنظمة التشغيل" },
-  { id: "dev", section: "tech", en: "Programming & Developers", ar: "البرمجة والمطورون" },
   // Gaming
   { id: "pc-gaming", section: "gaming", en: "PC Gaming", ar: "ألعاب الحاسوب" },
   { id: "consoles", section: "gaming", en: "PlayStation, Xbox & Nintendo", ar: "بلايستيشن وإكس بوكس ونينتندو" },
@@ -53,6 +60,83 @@ export function categoriesFor(section: Section): CategoryDef[] {
 
 export function categoryById(id: string): CategoryDef | undefined {
   return CATEGORIES.find((c) => c.id === id);
+}
+
+// ---------------------------------------------------------------------------
+// Reader-facing categories, in the reader's default priority order.
+
+export interface PriorityCategory {
+  id: string;
+  en: string;
+  ar: string;
+  /** Topic ids (above) that belong to this category. */
+  topics: string[];
+}
+
+export const PRIORITY_CATEGORIES: PriorityCategory[] = [
+  { id: "data", en: "Data Science & Analytics", ar: "علم البيانات والتحليلات", topics: ["data"] },
+  { id: "ai", en: "AI & Artificial Intelligence", ar: "الذكاء الاصطناعي", topics: ["ai"] },
+  {
+    id: "business",
+    en: "Business & Financial Results",
+    ar: "الأعمال والنتائج المالية",
+    topics: ["earnings", "acquisitions", "partnerships", "layoffs", "leadership", "strategy", "products"],
+  },
+  { id: "dev", en: "Programming & Open Source", ar: "البرمجة والمصادر المفتوحة", topics: ["dev"] },
+  { id: "security", en: "Cybersecurity & Hacking", ar: "الأمن السيبراني والاختراق", topics: ["security"] },
+  {
+    id: "hardware-gaming",
+    en: "PC Hardware & Gaming",
+    ar: "عتاد الحاسوب والألعاب",
+    topics: ["hardware", "chips", "pc-gaming", "consoles", "releases", "game-industry", "gaming-hardware", "platforms", "engines", "esports-business"],
+  },
+  { id: "saudi", en: "Saudi Technology & Startups", ar: "التقنية والشركات الناشئة في السعودية", topics: ["saudi"] },
+  { id: "robotics", en: "Robotics", ar: "الروبوتات", topics: ["robotics"] },
+];
+
+export const PRIORITY_IDS = PRIORITY_CATEGORIES.map((c) => c.id);
+
+/** Topics outside the priority list; kept (nothing is hidden) but ranked below it. */
+export const MORE_TOPIC_IDS = ["software", "mobile", "os"];
+
+/** Everything a reader can switch on or off: the 8 priority categories plus the extra topics. */
+export const INTEREST_IDS = [...PRIORITY_IDS, ...MORE_TOPIC_IDS];
+
+const TOPIC_TO_GROUP = new Map<string, string>();
+for (const g of PRIORITY_CATEGORIES) for (const t of g.topics) TOPIC_TO_GROUP.set(t, g.id);
+
+/** The priority category a topic belongs to (or the topic itself for "more topics"). */
+export function groupOfTopic(topic: string): string {
+  return TOPIC_TO_GROUP.get(topic) ?? topic;
+}
+
+/** Topic ids covered by a category or topic id (for filtering). */
+export function topicsOf(id: string): string[] {
+  return PRIORITY_CATEGORIES.find((g) => g.id === id)?.topics ?? [id];
+}
+
+/** All ids accepted as a category filter: priority categories and individual topics. */
+export const FILTER_IDS = [...new Set([...PRIORITY_IDS, ...CATEGORY_IDS])];
+
+/** Display label for a priority category or a topic. */
+export function categoryLabel(id: string): { en: string; ar: string } | undefined {
+  return PRIORITY_CATEGORIES.find((g) => g.id === id) ?? categoryById(id);
+}
+
+/** The story's highest-priority category, following the reader's order. */
+export function primaryCategory(topics: string[], order: string[] = PRIORITY_IDS): string | undefined {
+  const groups = [...new Set(topics.map(groupOfTopic))];
+  let best: string | undefined;
+  let bestRank = Infinity;
+  for (const g of groups) {
+    const rank = order.indexOf(g);
+    const r = rank === -1 ? 100 + MORE_TOPIC_IDS.indexOf(g) : rank;
+    if (r < bestRank) {
+      bestRank = r;
+      best = g;
+    }
+  }
+  return best;
 }
 
 export interface CompanyDef {

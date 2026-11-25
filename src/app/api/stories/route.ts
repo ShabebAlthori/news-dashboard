@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { CATEGORY_IDS, COMPANY_IDS, type Section } from "@/lib/shared/taxonomy";
+import { COMPANY_IDS, FILTER_IDS, type Section } from "@/lib/shared/taxonomy";
 import { error, json, parseIntParam } from "@/lib/server/http";
 import { listStories } from "@/lib/server/queries";
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const company = p.get("company") || undefined;
   const sort = p.get("sort") === "newest" ? "newest" : "importance";
   if (!SECTIONS.has(section)) return error(400, "Invalid section");
-  if (category && !CATEGORY_IDS.includes(category)) return error(400, "Invalid category");
+  if (category && !FILTER_IDS.includes(category)) return error(400, "Invalid category");
   if (company && !COMPANY_IDS.includes(company)) return error(400, "Invalid company");
   const q = (p.get("q") ?? "").slice(0, 200);
   const result = listStories({

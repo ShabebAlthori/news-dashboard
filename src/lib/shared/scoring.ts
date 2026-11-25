@@ -8,7 +8,7 @@
 //     + 15 × relevance      (match with the reader's selected categories & companies)
 //     − penalties           (rumour, review/opinion, clickbait signals)
 
-import { companyById, tierForScore, type EventType, type ImportanceTier } from "@/lib/shared/taxonomy";
+import { companyById, groupOfTopic, tierForScore, type EventType, type ImportanceTier } from "@/lib/shared/taxonomy";
 import type { ImportanceBreakdown } from "@/lib/shared/types";
 
 export const WEIGHTS = { significance: 35, coverage: 20, credibility: 15, impact: 15, relevance: 15 } as const;
@@ -56,17 +56,33 @@ export function baseScore(b: Omit<ImportanceBreakdown, "relevance">): number {
 }
 
 export interface RelevancePrefs {
+  /** Enabled priority categories / extra topics. */
   interests: Set<string>;
   followed: Set<string>;
-  allInterests: boolean; // the reader selected every category (no personal weighting)
+  /** Reader's priority order of the 8 categories (first = most important). */
+  order: string[];
 }
 
+export function toRelevancePrefs(prefs: { interests: string[]; followedCompanies: string[]; categoryOrder: string[] }): RelevancePrefs {
+  return { interests: new Set(prefs.interests), followed: new Set(prefs.followedCompanies), order: prefs.categoryOrder };
+}
+
+/**
+ * How well a story matches the reader (0..1). Categories higher in the reader's priority
+ * list weigh more: 1st → 1.0, each step down −0.05 (8th → 0.65); extra topics → 0.5.
+ */
 export function relevanceFactor(categories: string[], companies: string[], prefs: RelevancePrefs): number {
-  const catMatch = categories.some((c) => prefs.interests.has(c));
+  let catWeight = 0;
+  for (const topic of categories) {
+    const group = groupOfTopic(topic);
+    if (!prefs.interests.has(group)) continue;
+    const rank = prefs.order.indexOf(group);
+    catWeight = Math.max(catWeight, rank >= 0 ? 1 - rank * 0.05 : 0.5);
+  }
   const companyMatch = companies.some((c) => prefs.followed.has(c));
-  if (catMatch && companyMatch) return 1;
-  if (companyMatch) return 0.85;
-  if (catMatch) return prefs.allInterests ? 0.6 : 0.8;
+  if (catWeight > 0 && companyMatch) return 1;
+  if (companyMatch) return Math.max(0.85, 0.45 + 0.45 * catWeight);
+  if (catWeight > 0) return Math.round((0.45 + 0.45 * catWeight) * 1000) / 1000;
   if (categories.length === 0 && companies.length === 0) return 0.35;
   return 0.25;
 }

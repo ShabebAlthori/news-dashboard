@@ -1,9 +1,10 @@
 // In-browser query engine for the web edition. Mirrors lib/server/queries.ts, but works
 // on the JSON snapshot so the site can be hosted as static files.
+import { normalizePrefs } from "./prefs";
 import { matchesSearch, searchTerms } from "./search";
-import { finalScore, isBreaking, relevanceFactor, tier, type RelevancePrefs } from "./scoring";
-import { COMPANIES, type Section } from "./taxonomy";
-import type { CompanyPulse, DashboardResponse, Prefs, SnapshotStory, StoriesResponse, Story } from "./types";
+import { finalScore, isBreaking, relevanceFactor, tier, toRelevancePrefs, type RelevancePrefs } from "./scoring";
+import { COMPANIES, topicsOf, type Section } from "./taxonomy";
+import type { CategoryPulse, CompanyPulse, DashboardResponse, Prefs, SnapshotStory, StoriesResponse, Story } from "./types";
 
 const HOUR = 3_600_000;
 
@@ -36,12 +37,13 @@ interface Ranked extends SnapshotStory {
   relevance: number;
 }
 
+/** Preferences saved by older versions are migrated before ranking. */
+function withNormalizedPrefs(ctx: RankContext): RankContext {
+  return { ...ctx, prefs: normalizePrefs(ctx.prefs) };
+}
+
 function relevancePrefs(prefs: Prefs): RelevancePrefs {
-  return {
-    interests: new Set(prefs.interests),
-    followed: new Set(prefs.followedCompanies),
-    allInterests: prefs.interests.length === 0 || prefs.interests.length >= 23,
-  };
+  return toRelevancePrefs(prefs);
 }
 
 function urlsOf(s: Story): string[] {
@@ -61,7 +63,7 @@ function rank(stories: SnapshotStory[], q: StaticQuery, ctx: RankContext): Ranke
     if (q.from != null && s.lastActivity < q.from) continue;
     if (q.to != null && s.sortTime > q.to) continue;
     if (q.section && q.section !== "all" && !s.sections.includes(q.section)) continue;
-    if (q.category && !s.categories.includes(q.category)) continue;
+    if (q.category && !topicsOf(q.category).some((t) => s.categories.includes(t))) continue;
     if (q.company && !s.companies.includes(q.company)) continue;
     if (!ctx.prefs.showReviews && (s.eventType === "review" || s.eventType === "opinion") && !q.savedOnly) continue;
     if (!ctx.prefs.includeTechPolicy && s.policy && !q.savedOnly) continue;
@@ -120,9 +122,12 @@ function ungroup(list: Ranked[]): Story[] {
         ...s,
         id: -c.articleId,
         leadArticleId: c.articleId,
-        title: { original: c.title, en: c.title, ar: null },
-        summary: { en: c.excerpt ?? null, ar: null, origin: c.excerpt ? "feed" : "none", aiModel: null },
+        title: { original: c.title, en: c.title, ar: c.lang === "ar" ? c.title : null },
+        summary: c.lang === "ar"
+          ? { en: null, ar: c.excerpt ?? null, origin: c.excerpt ? "feed" : "none", aiModel: null }
+          : { en: c.excerpt ?? null, ar: null, origin: c.excerpt ? "feed" : "none", aiModel: null },
         url: c.url,
+        lang: c.lang ?? "en",
         source: { id: c.sourceId, name: c.sourceName, official: c.official },
         publishedAt: c.publishedAt,
         fetchedAt: c.fetchedAt,
@@ -143,7 +148,8 @@ function strip(s: Ranked): Story {
   return story as unknown as Story;
 }
 
-export function queryStories(stories: SnapshotStory[], q: StaticQuery, ctx: RankContext): StoriesResponse {
+export function queryStories(stories: SnapshotStory[], q: StaticQuery, rawCtx: RankContext): StoriesResponse {
+  const ctx = withNormalizedPrefs(rawCtx);
   const pool = q.savedOnly ? savedPool(stories, ctx) : stories;
   const list = rank(pool, q, ctx);
   sortRanked(list, q.sort ?? "importance");
@@ -154,7 +160,8 @@ export function queryStories(stories: SnapshotStory[], q: StaticQuery, ctx: Rank
   return { stories: page, total: all.length, nextCursor: offset + limit < all.length ? offset + limit : null, generatedAt: ctx.generatedAt };
 }
 
-export function buildDashboard(stories: SnapshotStory[], ctx: RankContext): DashboardResponse {
+export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext): DashboardResponse {
+  const ctx = withNormalizedPrefs(rawCtx);
   const now = ctx.now;
   const shown = new Set<number>();
   const pick = (list: Ranked[], n: number, minScore = 0) => {
@@ -193,10 +200,19 @@ export function buildDashboard(stories: SnapshotStory[], ctx: RankContext): Dash
     })
     .sort((a, b) => b.count - a.count);
 
-  return { top, tech, gaming, announcements, missed, companies, generatedAt: ctx.generatedAt };
+  const byCategory: CategoryPulse[] = ctx.prefs.categoryOrder
+    .filter((id) => ctx.prefs.interests.includes(id))
+    .map((categoryId) => {
+      const topics = topicsOf(categoryId);
+      const list = recent48.filter((c) => c.categories.some((t) => topics.includes(t)));
+      return { categoryId, count: list.length, stories: list.slice(0, 3).map(strip) };
+    });
+
+  return { byCategory, top, tech, gaming, announcements, missed, companies, generatedAt: ctx.generatedAt };
 }
 
-export function countCompanies(stories: SnapshotStory[], from: number, ctx: RankContext): Record<string, number> {
+export function countCompanies(stories: SnapshotStory[], from: number, rawCtx: RankContext): Record<string, number> {
+  const ctx = withNormalizedPrefs(rawCtx);
   const counts: Record<string, number> = {};
   for (const s of rank(stories, { from }, ctx)) for (const id of s.companies) counts[id] = (counts[id] ?? 0) + 1;
   return counts;

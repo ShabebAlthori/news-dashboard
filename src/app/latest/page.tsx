@@ -8,7 +8,7 @@ export default function LatestPage() {
       <FeedPage
         titleKey="page.latest.title"
         subtitleKey="page.latest.subtitle"
-        feed={{ section: "all", defaultSort: "newest", defaultRange: "3d", categorySections: [], showCompanyFilter: true }}
+        feed={{ section: "all", defaultSort: "newest", defaultRange: "3d", priorityChips: true, showCompanyFilter: true }}
       />
     </Suspense>
   );

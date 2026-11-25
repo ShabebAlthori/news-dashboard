@@ -8,7 +8,7 @@ export default function TechnologyPage() {
       <FeedPage
         titleKey="page.tech.title"
         subtitleKey="page.tech.subtitle"
-        feed={{ section: "tech", defaultSort: "importance", defaultRange: "3d", categorySections: ["tech"], showCompanyFilter: true }}
+        feed={{ section: "tech", defaultSort: "importance", defaultRange: "3d", priorityChips: true, showCompanyFilter: true }}
       />
     </Suspense>
   );

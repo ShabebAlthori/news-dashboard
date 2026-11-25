@@ -109,8 +109,29 @@ npm start
 
 ## Features
 
+**Your categories, in priority order**
+
+1. Data Science & Analytics
+2. AI & Artificial Intelligence
+3. Business & Financial Results
+4. Programming & Open Source
+5. Cybersecurity & Hacking
+6. PC Hardware & Gaming
+7. Saudi Technology & Startups
+8. Robotics
+
+- **Ranking:** a story ranks higher the higher its category is in your list. Change the order (up/down) or switch categories off in **Settings → Your categories**; nothing is ever hidden.
+- **Dashboard and filters:** the dashboard's **Your categories** section and the category chips follow your order.
+- **Sub-topics:** each category groups the detailed topics underneath it (for example, consoles, releases and game engines under *PC Hardware & Gaming*; earnings, acquisitions, layoffs and leadership under *Business & Financial Results*).
+- **More topics:** software, phones and operating systems stay available as extra topics ranked below the eight.
+- **Upgrading:** settings, saved stories and stored articles from earlier versions carry over. Old topic choices map to the new categories, and stored stories are re-tagged once for the new categories (additive only).
+
 **Content**
-- 31 legitimate RSS/Atom feeds: Ars Technica, The Verge (+ Gaming), TechCrunch, WIRED, Engadget, MIT Technology Review, Tom's Hardware, BleepingComputer, The Record, IGN, PC Gamer, GameSpot, Eurogamer, Rock Paper Shotgun, GamesIndustry.biz, VGC, and official newsrooms of NVIDIA, AMD, Microsoft, Google, Apple, OpenAI, Meta, Amazon, Samsung, PlayStation, Xbox, Steam, Unreal Engine and GitHub.
+- 41 legitimate RSS/Atom feeds: Ars Technica, The Verge (+ Gaming), TechCrunch, WIRED, Engadget, MIT Technology Review, Tom's Hardware, BleepingComputer, The Record, IGN, PC Gamer, GameSpot, Eurogamer, Rock Paper Shotgun, GamesIndustry.biz, VGC, and official newsrooms of NVIDIA, AMD, Microsoft, Google, Apple, OpenAI, Meta, Amazon, Samsung, PlayStation, Xbox, Steam, Unreal Engine and GitHub.
+  - **Data science:** SiliconANGLE (Data), KDnuggets and Towards Data Science. The last two are tutorial-heavy, so they get lower credibility and how-to posts are filtered.
+  - **Robotics:** The Robot Report, IEEE Spectrum Robotics and TechCrunch Robotics.
+  - **Saudi technology and startups:** Wamda, TechCrunch's Saudi Arabia feed, and two Saudi-based Arabic sites, البوابة التقنية (AIT News) and عالم التقنية (Tech-WD).
+- **Arabic-language sources** are classified with Arabic keyword rules (categories, companies, events, and the same excluded topics) and shown in Arabic. Until an AI provider translates them, English readers see the original Arabic with a note.
 - Categories: AI, software, cybersecurity, PC hardware & GPUs, CPUs & semiconductors, phones & consumer electronics, operating systems, programming; PC gaming, PlayStation/Xbox/Nintendo, releases, gaming industry, gaming hardware, Steam & platforms, game engines, esports business; earnings, acquisitions, partnerships, layoffs, leadership, strategy, product announcements.
 - 24 tracked companies (the 18 you listed plus TSMC, Arm, xAI, ByteDance, Epic Games, Ubisoft), with aliases such as Xbox → Microsoft, GeForce → NVIDIA, Rockstar/GTA → Take-Two.
 - **Strict exclusion** of politics and elections, political conflicts, sports (but not sports video games), esports match results, celebrity gossip, film/TV/music entertainment, shopping deals and coupons, how-to guides and walkthroughs, puzzle answers, podcasts/roundups, sponsored posts and clickbait. On the first real fetch, 174 of 571 items were filtered out this way (65 deals, 54 off-topic, 24 guides, 16 politics, 11 entertainment and a few others).
@@ -231,6 +252,8 @@ To use the cheaper model, set `ANTHROPIC_MODEL=claude-haiku-5-5`. That choice is
 | Reuters Technology | Reuters has offered no public RSS since 2020, and reuters.com's robots.txt disallows automated access. The legitimate route is a paid Reuters licence (Reuters Connect / API). Google News RSS is not a substitute: news.google.com's robots.txt disallows `/rss`. |
 | The Register | Its robots.txt denies unlisted crawlers by default and requires a licence for AI use. |
 | Unity Blog | unity.com's robots.txt disallows `/blog/rss`. |
+| Snowflake Blog | snowflake.com's robots.txt disallows `/feed/`. |
+| InfoWorld | Its robots.txt disallows the feed for unlisted crawlers. |
 | Nintendo, EA, Take-Two, Valve corporate, Qualcomm, Tencent, Anthropic | No public news feed was found. These companies are still covered through the publishers above (and Steam News for Valve). |
 
 To add a source, append it to `src/lib/server/sources.ts`. Sources can be switched off in Settings.
@@ -328,7 +351,7 @@ npm run typecheck
 npm run lint
 ```
 
-57 automated tests cover:
+84 automated tests cover:
 
 - feed parsing (RSS 2.0, Atom, RDF, missing dates)
 - text cleanup (decimals, entities, tracking parameters)
@@ -342,6 +365,7 @@ npm run lint
 - Arabic plural forms
 - the Claude, Gemini and Ollama clients against local mock servers
 - the web edition's in-browser ranking, filters, Arabic search, saved stories and dashboard
+- the priority categories: exact order, migration of older settings, priority-weighted ranking, category filters, the new topic rules, Arabic classification and exclusions, and the one-time re-tag of stored stories
 - a full pipeline run with a mocked network (cross-feed deduplication, clustering, an outage that preserves articles, rejection of a summary with an invented number, AI exclusion, dashboard and search)
 
 During development the app was also checked in a real browser (Playwright):

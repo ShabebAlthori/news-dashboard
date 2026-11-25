@@ -1,10 +1,10 @@
 "use client";
 
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { formatDateTime, formatRelative } from "@/lib/shared/format";
-import { categoriesFor, COMPANIES, SECTIONS } from "@/lib/shared/taxonomy";
+import { categoryLabel, COMPANIES, MORE_TOPIC_IDS } from "@/lib/shared/taxonomy";
 import type { Prefs, SourceHealth } from "@/lib/shared/types";
 import { Segmented, Switch } from "./controls";
 import { useNow, useUi, type ThemePref } from "./providers";
@@ -64,6 +64,13 @@ export function SettingsView() {
   }
 
   const toggleIn = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  const move = (list: string[], index: number, delta: number) => {
+    const next = [...list];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return next;
+    [next[index], next[target]] = [next[target], next[index]];
+    return next;
+  };
 
   return (
     <>
@@ -127,20 +134,64 @@ export function SettingsView() {
           )}
         </Card>
 
-        <Card title={t("settings.interests")} hint={t("settings.interestsHint")}>
-          {prefs &&
-            SECTIONS.map((s) => (
-              <div key={s.id} className="mb-4 last:mb-0">
-                <h3 className="mb-2 text-sm font-semibold text-muted">{s[lang]}</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {categoriesFor(s.id).map((c) => (
-                    <ToggleChip key={c.id} active={prefs.interests.includes(c.id)} onClick={() => save({ interests: toggleIn(prefs.interests, c.id) })}>
-                      {c[lang]}
-                    </ToggleChip>
-                  ))}
-                </div>
+        <Card title={t("settings.categories")} hint={t("settings.categoriesHint")}>
+          {prefs && (
+            <>
+              <ol className="divide-y divide-line rounded-lg border border-line">
+                {prefs.categoryOrder.map((id, i) => {
+                  const label = categoryLabel(id);
+                  const enabled = prefs.interests.includes(id);
+                  return (
+                    <li key={id} className="flex items-center gap-2 px-3 py-2">
+                      <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-subtle" aria-label={t("settings.priority", { n: i + 1 })}>
+                        {i + 1}
+                      </span>
+                      <span className={`min-w-0 flex-1 text-sm ${enabled ? "font-medium text-fg" : "text-subtle line-through"}`}>{label?.[lang] ?? id}</span>
+                      <button
+                        type="button"
+                        onClick={() => save({ categoryOrder: move(prefs.categoryOrder, i, -1) })}
+                        disabled={i === 0}
+                        className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-30"
+                        aria-label={`${t("settings.moveUp")}: ${label?.[lang] ?? id}`}
+                        title={t("settings.moveUp")}
+                      >
+                        <ChevronUp className="size-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => save({ categoryOrder: move(prefs.categoryOrder, i, 1) })}
+                        disabled={i === prefs.categoryOrder.length - 1}
+                        className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-30"
+                        aria-label={`${t("settings.moveDown")}: ${label?.[lang] ?? id}`}
+                        title={t("settings.moveDown")}
+                      >
+                        <ChevronDown className="size-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={enabled}
+                        aria-label={label?.[lang] ?? id}
+                        onClick={() => save({ interests: toggleIn(prefs.interests, id) })}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${enabled ? "border-accent bg-accent" : "border-line-strong bg-surface-2"}`}
+                      >
+                        <span className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"}`} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+              <h3 className="mb-1 mt-4 text-sm font-semibold text-muted">{t("settings.moreTopics")}</h3>
+              <p className="mb-2 text-xs text-subtle">{t("settings.moreTopicsHint")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {MORE_TOPIC_IDS.map((id) => (
+                  <ToggleChip key={id} active={prefs.interests.includes(id)} onClick={() => save({ interests: toggleIn(prefs.interests, id) })}>
+                    {categoryLabel(id)?.[lang] ?? id}
+                  </ToggleChip>
+                ))}
               </div>
-            ))}
+            </>
+          )}
         </Card>
 
         <Card title={t("settings.companies")} hint={t("settings.companiesHint")}>

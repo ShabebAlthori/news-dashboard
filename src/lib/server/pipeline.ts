@@ -8,7 +8,7 @@ import { getDb, parseJsonArray } from "./db";
 import { parseFeed, type ParsedItem } from "./feed-parser";
 import { fetchFeed } from "./fetcher";
 import { checkRobots } from "./robots";
-import { getPrefs } from "./settings";
+import { getPrefs, getSetting, setSetting } from "./settings";
 import { SOURCES, sourceById, type SourceDef } from "./sources";
 import { canonicalizeUrl, feedExcerptSummary, tokenize } from "./text";
 
@@ -94,10 +94,11 @@ function insertItems(db: Database.Database, source: SourceDef, items: ParsedItem
     `INSERT OR IGNORE INTO articles (
        source_id, guid, url, canonical_url, title, excerpt, content_text, author, image_url, published_at, fetched_at, updated_at,
        feed_categories, sections, categories, companies, event_type, significance, rumor, policy, clickbait, excluded, exclude_reason,
-       tokens, summary_en, summary_origin, ai_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       tokens, summary_en, title_ar, summary_ar, summary_origin, ai_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const inserted: number[] = [];
+  const arabic = source.lang === "ar";
   const tx = db.transaction(() => {
     for (const item of items) {
       const publishedAt = sanitizeDate(item.publishedAt, now);
@@ -135,7 +136,10 @@ function insertItems(db: Database.Database, source: SourceDef, items: ParsedItem
         c.excluded ? 1 : 0,
         c.excludeReason,
         JSON.stringify(tokens),
-        summary || null,
+        // Arabic-language sources: the publisher's own text is the Arabic version.
+        arabic ? null : summary || null,
+        arabic ? item.title : null,
+        arabic ? summary || null : null,
         summary ? "feed" : "none",
         c.excluded ? "skipped" : "pending",
       );
@@ -246,6 +250,78 @@ function clusterNewArticles(db: Database.Database, newIds: number[]): Set<number
   return touched;
 }
 
+// ---------------------------------------------------------------------------
+// One-time taxonomy upgrade for stories already in the database (additive only).
+
+const TAXONOMY_VERSION = 2;
+const NEW_TOPICS = ["data", "robotics", "saudi"];
+
+export function upgradeTaxonomy(db: Database.Database): { retagged: number; restored: number } {
+  if ((getSetting<number>("taxonomy_version") ?? 1) >= TAXONOMY_VERSION) return { retagged: 0, restored: 0 };
+  const rows = db
+    .prepare(
+      `SELECT id, source_id, title, excerpt, content_text, feed_categories, categories, excluded, exclude_reason, cluster_id
+       FROM articles WHERE excluded = 0 OR exclude_reason = 'off-topic'`,
+    )
+    .all() as {
+    id: number;
+    source_id: string;
+    title: string;
+    excerpt: string;
+    content_text: string;
+    feed_categories: string;
+    categories: string;
+    excluded: number;
+    exclude_reason: string | null;
+    cluster_id: number | null;
+  }[];
+  const addTopics = db.prepare("UPDATE articles SET categories = ? WHERE id = ?");
+  const restore = db.prepare(
+    `UPDATE articles SET excluded = 0, exclude_reason = NULL, ai_status = 'pending', sections = ?, categories = ?, companies = ?,
+       event_type = ?, significance = ?, rumor = ?, policy = ?, clickbait = ? WHERE id = ?`,
+  );
+  const touched = new Set<number>();
+  const restoredIds: number[] = [];
+  let retagged = 0;
+  const tx = db.transaction(() => {
+    for (const r of rows) {
+      const source = sourceById(r.source_id);
+      if (!source) continue;
+      const text = r.content_text.length > r.excerpt.length ? r.content_text : r.excerpt;
+      const c = classify({ title: r.title, text, feedCategories: parseJsonArray(r.feed_categories), source });
+      const fresh = c.categories.filter((t) => NEW_TOPICS.includes(t));
+      if (r.excluded === 0) {
+        const current = parseJsonArray(r.categories);
+        const missing = fresh.filter((t) => !current.includes(t));
+        if (missing.length) {
+          addTopics.run(JSON.stringify([...current, ...missing]), r.id);
+          retagged++;
+          if (r.cluster_id != null) touched.add(r.cluster_id);
+        }
+      } else if (!c.excluded && (fresh.length > 0 || c.categories.includes("strategy"))) {
+        // Previously off-topic, now within a category (e.g. robotics, startups).
+        restore.run(
+          JSON.stringify(c.sections),
+          JSON.stringify(c.categories),
+          JSON.stringify(c.companies),
+          c.eventType,
+          c.significance,
+          c.rumor ? 1 : 0,
+          c.policy ? 1 : 0,
+          c.clickbaitPenalty,
+          r.id,
+        );
+        restoredIds.push(r.id);
+      }
+    }
+    for (const id of touched) recomputeCluster(db, id);
+  });
+  tx();
+  clusterNewArticles(db, restoredIds);
+  setSetting("taxonomy_version", TAXONOMY_VERSION);
+  return { retagged, restored: restoredIds.length };
+}
+
 function cleanup(db: Database.Database) {
   const retentionMs = getPrefs().retentionDays * 24 * 3_600_000;
   const cutoff = Date.now() - retentionMs;
@@ -283,6 +359,8 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
 
   try {
     syncSources(db);
+    const upgrade = upgradeTaxonomy(db);
+    if (upgrade.retagged || upgrade.restored) console.log(`[refresh] taxonomy upgrade: ${upgrade.retagged} re-tagged, ${upgrade.restored} restored`);
     const rows = db.prepare("SELECT id, url, enabled, etag, last_modified, consecutive_failures, next_attempt_at FROM sources").all() as SourceRow[];
     const enabled = rows.filter((r) => r.enabled && sourceById(r.id));
     const newIds: number[] = [];

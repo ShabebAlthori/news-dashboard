@@ -6,6 +6,7 @@
 import { buildDashboard, countCompanies, queryStories, type RankContext } from "@/lib/shared/rank";
 import type { Section } from "@/lib/shared/taxonomy";
 import type { Prefs, Snapshot, SnapshotStory, SourceHealth, StatusResponse, Story } from "@/lib/shared/types";
+import { normalizePrefs } from "@/lib/shared/prefs";
 import { BASE_PATH } from "./mode";
 
 interface StatusFile {
@@ -69,7 +70,8 @@ async function getSnapshot(): Promise<Snapshot> {
 }
 
 export function getPrefs(defaults: Prefs): Prefs {
-  return { ...defaults, ...readStorage<Partial<Prefs>>(KEYS.prefs, {}) };
+  // Settings saved before the priority categories existed are migrated, not reset.
+  return normalizePrefs({ ...defaults, categoryOrder: [], ...readStorage<Partial<Prefs>>(KEYS.prefs, {}) } as Prefs);
 }
 
 function savedMap(): Map<string, SnapshotStory> {
@@ -173,7 +175,7 @@ export function addRead(url: string) {
 
 export async function setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
   const snap = await getSnapshot();
-  const next = { ...getPrefs(snap.defaultPrefs), ...patch };
+  const next = normalizePrefs({ ...getPrefs(snap.defaultPrefs), ...patch });
   writeStorage(KEYS.prefs, next);
   return next;
 }
