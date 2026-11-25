@@ -129,6 +129,11 @@ describe("classification of the new categories", () => {
     expect(run("Google is opening an AI hub in Saudi Arabia").categories).toContain("saudi");
   });
 
+  it("does not read national security as cybersecurity", () => {
+    expect(run("Experts say Nvidia's economic importance may outweigh national security concerns").categories).not.toContain("security");
+    expect(run("Microsoft patches security flaw in Windows").categories).toContain("security");
+  });
+
   it("needs a technology angle for Saudi stories", () => {
     expect(run("Saudi Arabia announces new tourism visa rules").excluded).toBe(true);
     // Government tech initiatives are technology news, not politics.

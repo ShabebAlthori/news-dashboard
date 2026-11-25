@@ -198,7 +198,8 @@ const CATEGORY_PATTERNS: Record<string, RegExp[]> = {
     ar("تطبيق|تطبيقات|برنامج|برمجيات|متصفح|واتساب|إنستغرام|يوتيوب|تيك توك|منصة|خدمة جديدة"),
   ],
   security: [
-    /\b(security|cybersecurity|cyber(?!punk)\w*|hack(s|ed|er|ers|ing)?|breach(es|ed)?|ransomware|malware|vulnerabilit(y|ies)|zero-day|0-day|exploit(s|ed)?|cve-\d+|phishing|data (leak|breach|theft)|leaked data|spyware|backdoor|patch tuesday|botnets?|ddos|infostealers?|cyberattacks?|encryption|passkeys?|passwords?|threat actors?|apt\d+|shinyhunters|lazarus)\b/i,
+    // "National/social/job security" is not cybersecurity.
+    /\b((?<!(national|homeland|social|job|food|energy|economic) )security|cybersecurity|cyber(?!punk)\w*|hack(s|ed|er|ers|ing)?|breach(es|ed)?|ransomware|malware|vulnerabilit(y|ies)|zero-day|0-day|exploit(s|ed)?|cve-\d+|phishing|data (leak|breach|theft)|leaked data|spyware|backdoor|patch tuesday|botnets?|ddos|infostealers?|cyberattacks?|encryption|passkeys?|passwords?|threat actors?|apt\d+|shinyhunters|lazarus)\b/i,
     ar("أمن سيبراني|الأمن السيبراني|اختراق|قراصنة|هجوم إلكتروني|هجمات إلكترونية|هجوم سيبراني|ثغرة|ثغرات|برمجيات خبيثة|برمجية خبيثة|فدية|تسريب بيانات|احتيال|تصيد|كلمات المرور|كلمة المرور|التشفير"),
   ],
   hardware: [
