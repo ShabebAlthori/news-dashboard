@@ -188,7 +188,7 @@ Feeds give an English headline and usually a short excerpt. Producing natural Ar
 | **Ollama (free)** | Free; runs on your own machine | Depends on the model (Qwen 2.5 7B and larger handle Arabic reasonably; smaller models are weaker) | Install [Ollama](https://ollama.com), `ollama pull qwen2.5:7b-instruct`, set `AI_PROVIDER=ollama` |
 | **No AI** | Free | No Arabic summaries | Default when no key is set |
 
-**About the Gemini free tier:** Google lists `gemini-3.8-flash` and `gemini-3.5-flash-lite` as free of charge on the free tier, within per-minute and per-day request limits shown in AI Studio. The app spaces requests about 6.5 seconds apart, switches to `gemini-3.5-flash-lite` when the main model's daily quota is used up, and shows publisher excerpts for anything left unsummarized. Google states that free-tier requests may be used to improve its products; here they contain only public news text from the feeds.
+**About the Gemini free tier:** Google lists `gemini-3.8-flash` and `gemini-3.5-flash-lite` as free of charge on the free tier, within per-minute and per-day request limits shown in AI Studio. The app spaces requests about 6.5 seconds apart, retries once when a model is busy ("high demand"), then tries the other free models in turn (`gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.1-flash-lite`), and shows publisher excerpts for anything left unsummarized. Google states that free-tier requests may be used to improve its products; here they contain only public news text from the feeds.
 
 ### Costs (Claude)
 
@@ -254,7 +254,7 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `ANTHROPIC_EFFORT` | `low` | `low`, `medium` or `high` |
 | `ANTHROPIC_FALLBACKS` | `default` | Server-side refusal fallbacks (`off` to disable) |
 | `GEMINI_API_KEY` | — | Google Gemini API key (free tier available) |
-| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | `gemini-3.8-flash` / `gemini-3.5-flash-lite` | Gemini models (fallback used when the main model's quota is used up) |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` | `gemini-3.8-flash` / `gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.1-flash-lite` | Gemini models; fallbacks are tried in order when the main model is busy or out of free quota |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `qwen2.5:7b-instruct` | Free local model |
 | `AI_MAX_ARTICLES_PER_RUN` / `AI_DAILY_LIMIT` / `AI_CONCURRENCY` | `30` / `200` / `3` | Cost and throughput guards |
 | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | — | HTTP Basic auth for the whole app when both are set |

@@ -44,7 +44,7 @@ function modelsToTry(): string[] {
     quotaDay = today;
     quotaExhausted = new Set();
   }
-  return [config.ai.geminiModel, config.ai.geminiFallbackModel].filter((m, i, all) => m && all.indexOf(m) === i && !quotaExhausted.has(m));
+  return [config.ai.geminiModel, ...config.ai.geminiFallbackModels].filter((m, i, all) => m && all.indexOf(m) === i && !quotaExhausted.has(m));
 }
 
 async function call(model: string, article: PromptArticle): Promise<{ output: AiOutput; model: string }> {

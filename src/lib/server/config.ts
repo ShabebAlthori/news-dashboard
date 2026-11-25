@@ -49,7 +49,11 @@ export const config = {
     ollamaModel: process.env.OLLAMA_MODEL || "qwen2.5:7b-instruct",
     geminiApiKey: process.env.GEMINI_API_KEY || "",
     geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
-    geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.5-flash-lite",
+    /** Comma-separated, tried in order when the main model is busy or out of free quota. */
+    geminiFallbackModels: (process.env.GEMINI_FALLBACK_MODELS ?? process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.1-flash-lite")
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean),
     geminiBaseUrl: (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, ""),
     /** Free-tier friendly spacing between Gemini requests. */
     geminiMinIntervalMs: int("GEMINI_MIN_INTERVAL_MS", 6500, 0, 60000),
