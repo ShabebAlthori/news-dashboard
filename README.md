@@ -1,0 +1,348 @@
+# Briefing · الموجز
+
+A personal, bilingual (Arabic / English) technology and gaming news dashboard. It collects news from reputable publishers and official company newsrooms, removes duplicates and noise, groups coverage of the same event into one story, ranks stories by importance, and summarizes them in English and Arabic.
+
+It is built to answer, in one screen:
+
+- What happened in technology today?
+- What are the biggest developments in gaming?
+- What are NVIDIA, AMD, Microsoft, Apple, Google and the other major companies doing?
+- Which announcements matter?
+- Which important stories did I miss?
+
+| English (light) | Arabic (dark) |
+| --- | --- |
+| ![Dashboard in English](docs/screenshots/dash-en-light.png) | ![Dashboard in Arabic](docs/screenshots/dash-ar-dark.png) |
+| ![Technology page](docs/screenshots/tech-en-dark.png) | ![NVIDIA company page in Arabic](docs/screenshots/company-nvidia-ar.png) |
+
+<img src="docs/screenshots/mobile-dash-ar.png" alt="Mobile, Arabic" width="300">
+
+> The screenshots show real articles fetched on 25 Nov 2026 **without** an AI key configured. In that mode cards show the publisher's own excerpt, and Arabic readers see a note that the Arabic summary is not available yet. See [AI summaries](#ai-summaries--translation).
+
+---
+
+## Contents
+
+1. [Quick start](#quick-start)
+2. [Features](#features)
+3. [How it works](#how-it-works)
+4. [AI summaries & translation](#ai-summaries--translation) — why a key is needed, costs, free alternatives
+5. [Sources and compliance](#sources-and-compliance)
+6. [Configuration](#configuration)
+7. [Deployment](#deployment)
+8. [Testing](#testing)
+9. [Project structure](#project-structure)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## Quick start
+
+Requirements: **Node.js 20.9+** (22 LTS recommended) and npm. No external database is needed; SQLite is embedded.
+
+```bash
+npm install
+```
+
+```bash
+cp .env.example .env.local
+```
+
+Optionally put your Claude API key in `.env.local` (`ANTHROPIC_API_KEY=...`). Then:
+
+```bash
+npm run dev
+```
+
+Open <http://localhost:3000>. The first refresh starts about 5 seconds after the server boots and takes 5–15 seconds; after that feeds refresh automatically every 12 minutes (10–15, configurable).
+
+To fetch on demand from the command line:
+
+```bash
+npm run refresh
+```
+
+For production:
+
+```bash
+npm run build
+```
+
+```bash
+npm start
+```
+
+---
+
+## Features
+
+**Content**
+- 31 legitimate RSS/Atom feeds: Ars Technica, The Verge (+ Gaming), TechCrunch, WIRED, Engadget, MIT Technology Review, Tom's Hardware, BleepingComputer, The Record, IGN, PC Gamer, GameSpot, Eurogamer, Rock Paper Shotgun, GamesIndustry.biz, VGC, and official newsrooms of NVIDIA, AMD, Microsoft, Google, Apple, OpenAI, Meta, Amazon, Samsung, PlayStation, Xbox, Steam, Unreal Engine and GitHub.
+- Categories: AI, software, cybersecurity, PC hardware & GPUs, CPUs & semiconductors, phones & consumer electronics, operating systems, programming; PC gaming, PlayStation/Xbox/Nintendo, releases, gaming industry, gaming hardware, Steam & platforms, game engines, esports business; earnings, acquisitions, partnerships, layoffs, leadership, strategy, product announcements.
+- 24 tracked companies (the 18 you listed plus TSMC, Arm, xAI, ByteDance, Epic Games, Ubisoft), with aliases such as Xbox → Microsoft, GeForce → NVIDIA, Rockstar/GTA → Take-Two.
+- **Strict exclusion** of politics and elections, political conflicts, sports (but not sports video games), esports match results, celebrity gossip, film/TV/music entertainment, shopping deals and coupons, how-to guides and walkthroughs, puzzle answers, podcasts/roundups, sponsored posts and clickbait. On the first real fetch, 174 of 571 items were filtered out this way (65 deals, 54 off-topic, 24 guides, 16 politics, 11 entertainment and a few others).
+
+**Reading experience**
+- Dashboard: Top stories · Technology today · Biggest in gaming · Company pulse · Key announcements · You might have missed (important stories you haven't opened).
+- Pages: Latest, Technology, Gaming, Companies (grid + per-company feed), Search, Saved, Settings.
+- Each card shows: headline (with the original headline whenever a translated or cleaned-up one is shown), a 2–4 sentence summary, category, source (official sources marked), **publication time** (absolute and relative), number of independent sources, an importance indicator, links to other coverage, a "Why it ranks here" breakdown, and the **retrieval time**. Each card can be flipped to its other-language version.
+- Filters: category, company, date (today, 24 h, 3/7/30 days, any time, custom range), sort by importance or newest, and "Group same story" on/off. Filters live in the URL, so switching language never loses the current page or filters.
+- Search in English or Arabic (full-text, prefix matching; Arabic company names and key terms also match English text).
+- Arabic is first-class: server-rendered `dir="rtl"` with no flash, IBM Plex Sans Arabic with generous line height, logical CSS properties throughout, Arabic plural rules, Western digits, isolated English fragments inside Arabic text.
+- Dark, light and system themes; responsive layout with a sidebar on desktop and a header plus bottom tabs on mobile; no decorative animations.
+
+**Reliability**
+- Automatic refresh every 10–15 minutes (in-process scheduler with a database lock; optional standalone worker or external cron).
+- Last successful update time is always visible; failing sources are listed and their previously retrieved articles stay available.
+- Conditional requests (ETag / Last-Modified), timeouts, response size limits, exponential backoff and `Retry-After` handling.
+- Duplicate removal by canonical URL (tracking parameters stripped) and by feed GUID.
+
+---
+
+## How it works
+
+```
+ RSS/Atom feeds ─► fetch (robots.txt, conditional GET, backoff)
+                 ─► parse (RSS 2.0 / Atom / RDF) ─► clean text
+                 ─► dedupe (canonical URL, GUID)
+                 ─► classify (exclusions, categories, companies, event type, significance)
+                 ─► cluster (same event across outlets)
+                 ─► score (importance 0–100) ─► AI summary + Arabic translation (optional)
+                 ─► SQLite ─► JSON API ─► Next.js UI (SWR, auto-refresh)
+```
+
+### Importance score (0–100)
+
+| Component | Weight | What it measures |
+| --- | --- | --- |
+| Significance | 35 | Event type: acquisitions, CEO changes, layoffs, earnings and major security incidents rank above launches, which rank above updates; reviews and opinion rank lowest. Dollar amounts, flagship products and top-tier companies raise it; rumours and clickbait lower it. If AI is enabled, its 1–5 rating is blended in (50/50). |
+| Independent coverage | 20 | Distinct publishers covering the event (The Verge and The Verge Gaming count once). 1 → 0, 2 → 0.45, 3 → 0.7, 4 → 0.85, 5+ → 1. |
+| Credibility | 15 | Best editorial reliability weight among the sources in the cluster. |
+| Industry impact | 15 | Tier of the companies involved, plus high-impact sectors (AI, chips, security, corporate events). |
+| Relevance | 15 | Match with the categories and companies you choose in Settings. |
+| Penalties | − | Rumour (−6), review/opinion (−12), clickbait signals (up to −8), headline-only (−2). |
+
+Tiers: **Major** ≥ 72 · **Notable** ≥ 55 · **Standard** ≥ 38 · **Minor** below that.
+
+**Breaking** is deliberately rare. A story is labelled breaking only if it was first published within the last 6 hours, is reported by at least 3 independent publishers, is not a rumour, has significance ≥ 0.7 and has an overall score ≥ 72.
+
+### Story clustering
+
+Headlines are tokenized (stop words removed, inflections normalized, `GPT-5` → `gpt5`), weighted by rarity across recent articles, and compared with a weighted Dice similarity. Articles within 36 hours of each other whose similarity reaches 0.42, and which share at least one rare word, join the same story. The most credible article with real text becomes the lead; the others appear under "Other coverage". In the first real run, NVIDIA's reinstatement of Jensen Huang grouped 7 articles from 7 independent outlets, including NVIDIA's own newsroom, while separate GTA 6 stories (patch, PC port, sales) stayed separate.
+
+### Publication time vs. retrieval time
+
+- **Published**: the time the publisher states in its feed. If a feed gives no date, or an implausible future date, the card says "Publication time not provided by the source". Dates are never invented.
+- **Retrieved**: when this dashboard first fetched the article. It is shown separately on every card.
+
+---
+
+## AI summaries & translation
+
+### Why an API key is needed
+
+Feeds give an English headline and usually a short excerpt. Producing natural Arabic headlines and summaries, plus a consistent 2–4 sentence English summary, needs a language model. Without one the app still works fully, with these differences:
+
+- English cards show the publisher's own excerpt, labelled "Excerpt from the publisher" (copied word for word, never rewritten).
+- Arabic readers get the full Arabic interface, but the story text is the source's English, with a short note explaining that the Arabic summary is not available yet.
+
+### Options
+
+| Option | Cost | Arabic quality | Setup |
+| --- | --- | --- | --- |
+| **Claude (default)** | Paid per use | Natural, idiomatic Arabic | `ANTHROPIC_API_KEY=...` |
+| **Ollama (free)** | Free; runs on your own machine | Depends on the model (Qwen 2.5 7B and larger handle Arabic reasonably; smaller models are weaker) | Install [Ollama](https://ollama.com), `ollama pull qwen2.5:7b-instruct`, set `AI_PROVIDER=ollama` |
+| **No AI** | Free | No Arabic summaries | Default when no key is set |
+
+### Costs (Claude)
+
+The default model is `claude-opus-5-5`, used at `low` effort. Each story lead is summarized once, and only story leads are summarized, not every duplicate article. As a rough estimate, each summary uses about 2–3k input tokens and about 1k output tokens. That is roughly **$0.03 per story** on Opus 5.5 and roughly **$0.001 per story** on Claude Haiku 5.5. A typical day produces something like 100–200 new stories, which is about $3–6 per day on Opus 5.5 or a few cents per day on Haiku.
+
+These are estimates; check actual usage in the Anthropic Console. Built-in guards:
+
+- `AI_MAX_ARTICLES_PER_RUN=30` limits each refresh.
+- `AI_DAILY_LIMIT=200` caps any 24-hour period.
+- The most important stories are summarized first.
+- Only stories from the last 3 days are summarized.
+
+To use the cheaper model, set `ANTHROPIC_MODEL=claude-haiku-5-5`. That choice is yours: Opus writes stronger Arabic and is the default.
+
+### Accuracy safeguards
+
+- The model sees only the text the publisher makes available in its feed. Articles are never scraped, and paywalled pages are never fetched.
+- The system prompt forbids adding facts, requires that rumours, estimates and leaks stay hedged in both languages ("reportedly", «بحسب تقارير»), and treats article text as untrusted data, never as instructions.
+- Output must match a strict JSON schema, which the API enforces through structured outputs and the app checks again with Zod.
+- **Number check:** every number in the generated headlines and summaries (English and Arabic, including Arabic-Indic digits) must appear in the source text. If any number does not, the summary is discarded and the publisher's excerpt is shown instead.
+- Stories the model identifies as politics, sports, entertainment, celebrity news, deals or clickbait are excluded, together with the other articles in the same story.
+- Refusals are handled: with Opus 5.5 the request includes server-side refusal fallbacks (`ANTHROPIC_FALLBACKS=default`); a refused story keeps its publisher excerpt.
+- Publishers whose robots.txt sets `Content-Signal: ai-input=no` are never sent to a model; their stories show the excerpt only.
+
+> **Testing note:** the Claude integration was tested with the real Anthropic SDK against a local mock of the API. The tests cover the request shape, structured output, effort, refusal fallbacks, refusal and auth errors, and the full pipeline. No real API key was available while building this, so the quality of real Arabic summaries has not been reviewed yet. Check a handful of stories after you add your key.
+
+---
+
+## Sources and compliance
+
+- Only feeds the publishers offer for syndication are used; there is no HTML scraping.
+- `robots.txt` is checked per host (cached for 24 hours) using the fetcher's own product token (`PersonalNewsDashboard`). A disallowed feed is skipped and shown as "Blocked by robots.txt" in Settings.
+- Each feed is requested at most once per refresh, with conditional requests. On the second refresh, 20 of 31 feeds answered `304 Not Modified`.
+- Every card links to the original article; the dashboard keeps the original headline.
+
+**Deliberately not included:**
+
+| Source | Why |
+| --- | --- |
+| Reuters Technology | Reuters has offered no public RSS since 2020, and reuters.com's robots.txt disallows automated access. The legitimate route is a paid Reuters licence (Reuters Connect / API). Google News RSS is not a substitute: news.google.com's robots.txt disallows `/rss`. |
+| The Register | Its robots.txt denies unlisted crawlers by default and requires a licence for AI use. |
+| Unity Blog | unity.com's robots.txt disallows `/blog/rss`. |
+| Nintendo, EA, Take-Two, Valve corporate, Qualcomm, Tencent, Anthropic | No public news feed was found. These companies are still covered through the publishers above (and Steam News for Valve). |
+
+To add a source, append it to `src/lib/server/sources.ts`. Sources can be switched off in Settings.
+
+---
+
+## Configuration
+
+All configuration is via environment variables (see [`.env.example`](.env.example)). Reader preferences are stored in the database and edited in **Settings**: interests, followed companies, reviews on/off, tech-policy news on/off, images, refresh interval and retention. Secrets are only read on the server and never sent to the browser.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DATABASE_PATH` | `./data/news.db` | SQLite file |
+| `REFRESH_INTERVAL_MINUTES` | `12` | Default interval, 10–15 |
+| `DISABLE_SCHEDULER` | `false` | Turn off the in-process scheduler (use `npm run worker` or cron instead) |
+| `CRON_SECRET` | — | Enables `POST /api/refresh` with `Authorization: Bearer <secret>` |
+| `FETCH_CONTACT` | — | Contact URL/email appended to the User-Agent |
+| `AI_PROVIDER` | auto | `anthropic`, `ollama` or `none` |
+| `ANTHROPIC_API_KEY` | — | Claude API key |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Model id |
+| `ANTHROPIC_EFFORT` | `low` | `low`, `medium` or `high` |
+| `ANTHROPIC_FALLBACKS` | `default` | Server-side refusal fallbacks (`off` to disable) |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `qwen2.5:7b-instruct` | Free local model |
+| `AI_MAX_ARTICLES_PER_RUN` / `AI_DAILY_LIMIT` / `AI_CONCURRENCY` | `30` / `200` / `3` | Cost and throughput guards |
+| `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | — | HTTP Basic auth for the whole app when both are set |
+
+---
+
+## Deployment
+
+The app needs a **long-running Node.js process with a persistent disk**, because of the SQLite file and the built-in scheduler. That makes it a good fit for Docker on a VPS or home server, Fly.io or Railway with a volume, or a Raspberry Pi. Serverless platforms such as Vercel are a poor fit because they have no persistent filesystem or background timers. If you need serverless, replace SQLite with a hosted database and call `/api/refresh` from a cron.
+
+### Docker (recommended)
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` (at minimum set `DASHBOARD_USER`/`DASHBOARD_PASSWORD` if the server is reachable from the internet), then:
+
+```bash
+docker compose up -d --build
+```
+
+The image builds Next.js in standalone mode, runs as a non-root user, stores the database in the `briefing-data` volume at `/data`, and includes a health check. It was built and run successfully while developing this app (health: healthy; first refresh: 31 sources, 571 articles). Put it behind a reverse proxy with HTTPS (Caddy, nginx, Traefik).
+
+### Plain Node.js (VPS, systemd or pm2)
+
+```bash
+npm ci
+```
+
+```bash
+npm run build
+```
+
+```bash
+NODE_ENV=production PORT=3000 npm start
+```
+
+Keep `data/` on persistent storage and back it up if you care about saved stories.
+
+### External scheduler (optional)
+
+Set `DISABLE_SCHEDULER=true` and `CRON_SECRET`, then trigger refreshes every 12 minutes:
+
+```bash
+curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-host/api/refresh
+```
+
+Alternatively, run `npm run worker` as a separate process next to the web server.
+
+### Security checklist
+
+- Set `DASHBOARD_USER`/`DASHBOARD_PASSWORD` (or put the app behind your own auth) before exposing it, and always use HTTPS.
+- State-changing endpoints reject cross-site requests; manual refreshes are rate-limited to one every 3 minutes.
+- API keys live only in server environment variables.
+- The site sends `X-Frame-Options`, `nosniff`, `Referrer-Policy` and `Permissions-Policy` headers and asks search engines not to index it.
+
+---
+
+## Testing
+
+```bash
+npm test
+```
+
+```bash
+npm run typecheck
+```
+
+```bash
+npm run lint
+```
+
+49 automated tests cover:
+
+- feed parsing (RSS 2.0, Atom, RDF, missing dates)
+- text cleanup (decimals, entities, tracking parameters)
+- exclusion rules on real headlines
+- categories, companies and events
+- clustering
+- scoring and the breaking rule
+- the AI number check
+- robots Content-Signal parsing
+- search query building (including Arabic synonyms)
+- Arabic plural forms
+- the Claude and Ollama clients against local mock servers
+- a full pipeline run with a mocked network (cross-feed deduplication, clustering, an outage that preserves articles, rejection of a summary with an invented number, AI exclusion, dashboard and search)
+
+During development the app was also checked in a real browser (Playwright):
+
+- every page in English and Arabic, light and dark, desktop and mobile
+- no console errors and no horizontal overflow
+- switching language keeps the URL and filters
+- saving, coverage links, Arabic search, per-card language switching
+- refresh rate limiting and cross-site request rejection
+
+---
+
+## Project structure
+
+```
+src/
+  app/                    Pages (dashboard, latest, technology, gaming, companies, search, saved, settings) and API routes
+  components/             Client UI: app shell, story card, feed + filters, dashboard, settings
+  lib/shared/             Client-safe code: taxonomy, i18n (en/ar), formatting, types
+  lib/server/             Server-only code
+    sources.ts            Feed registry (with reasons for exclusions)
+    fetcher.ts robots.ts  Polite fetching
+    feed-parser.ts text.ts
+    classify.ts           Exclusion rules, categories, companies, events, significance
+    cluster.ts scoring.ts Story grouping and importance
+    ai/                   Claude + Ollama providers, prompt, fact guard
+    pipeline.ts           Refresh pipeline; scheduler.ts runs it on a timer
+    queries.ts            Story listing, dashboard, search
+  instrumentation.ts      Starts the scheduler with the server
+  proxy.ts                Optional Basic auth
+scripts/                  refresh.ts (one-off), worker.ts (standalone scheduler)
+tests/                    Vitest suites
+```
+
+---
+
+## Troubleshooting
+
+- **No stories yet**: the first refresh runs about 5 seconds after boot. Check the sidebar status, or run `npm run refresh` and read its JSON output.
+- **A source shows "Unavailable"**: the error is listed in Settings → Sources. The app retries with backoff, and that source's earlier articles stay visible.
+- **Arabic summaries missing**: check Settings → Summaries & translation for the provider status and the last error. Without a provider, Arabic summaries are intentionally unavailable.
+- **`better-sqlite3` build errors**: use Node 20.9+ on a platform with prebuilt binaries, or install a C++ toolchain (`python3 make g++`).
+- **Behind a corporate HTTP proxy**: Node's built-in `fetch` ignores `HTTPS_PROXY` unless you set `NODE_USE_ENV_PROXY=1` (Node 22.21+).

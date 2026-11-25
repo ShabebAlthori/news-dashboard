@@ -1,0 +1,250 @@
+"use client";
+
+import { BadgeCheck } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import useSWR from "swr";
+import { formatDateTime, formatRelative } from "@/lib/shared/format";
+import { categoriesFor, COMPANIES, SECTIONS } from "@/lib/shared/taxonomy";
+import type { Prefs, SourceHealth } from "@/lib/shared/types";
+import { Segmented, Switch } from "./controls";
+import { useNow, useUi, type ThemePref } from "./providers";
+import { PageHeader } from "./states";
+import { StatusIndicator } from "./status-indicator";
+import { useStatus } from "./use-data";
+
+function Card({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-line bg-surface p-5">
+      <h2 className="text-base font-bold text-fg">{title}</h2>
+      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function ToggleChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-sm ${active ? "border-accent bg-accent-soft font-medium text-accent-strong" : "border-line text-muted hover:text-fg"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function SettingsView() {
+  const { t, lang, setLang, theme, setTheme } = useUi();
+  const now = useNow();
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Prefs>("/api/settings");
+  const { data: sources, mutate: mutateSources } = useSWR<SourceHealth[]>("/api/sources", { refreshInterval: 60_000 });
+  const { data: status } = useStatus();
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function save(patch: Partial<Prefs>) {
+    if (!prefs) return;
+    const optimistic = { ...prefs, ...patch };
+    await mutatePrefs(
+      async () => {
+        const res = await fetch("/api/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+        if (!res.ok) throw new Error("save failed");
+        return (await res.json()) as Prefs;
+      },
+      { optimisticData: optimistic, rollbackOnError: true, revalidate: false },
+    ).then(
+      () => setMessage(t("settings.saved")),
+      () => setMessage(t("settings.saveError")),
+    );
+    setTimeout(() => setMessage(null), 2000);
+  }
+
+  async function toggleSource(id: string, enabled: boolean) {
+    const res = await fetch("/api/sources", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, enabled }) });
+    if (res.ok) await mutateSources(await res.json(), { revalidate: false });
+  }
+
+  const toggleIn = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+  return (
+    <>
+      <PageHeader title={t("page.settings.title")} actions={message ? <span className="text-sm text-ok" role="status">{message}</span> : null} />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card title={t("settings.display")}>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="font-medium text-fg">{t("settings.language")}</span>
+              <Segmented
+                label={t("settings.language")}
+                value={lang}
+                onChange={setLang}
+                options={[
+                  { value: "ar", label: "العربية", lang: "ar" },
+                  { value: "en", label: "English", lang: "en" },
+                ]}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="font-medium text-fg">{t("settings.theme")}</span>
+              <Segmented<ThemePref>
+                label={t("settings.theme")}
+                value={theme}
+                onChange={setTheme}
+                options={[
+                  { value: "light", label: t("theme.light") },
+                  { value: "dark", label: t("theme.dark") },
+                  { value: "system", label: t("theme.system") },
+                ]}
+              />
+            </div>
+            {prefs && <Switch id="show-images" checked={prefs.showImages} onChange={(v) => save({ showImages: v })} label={t("settings.showImages")} />}
+          </div>
+        </Card>
+
+        <Card title={t("settings.updates")}>
+          {prefs && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="font-medium text-fg">{t("settings.interval")}</span>
+                <Segmented
+                  label={t("settings.interval")}
+                  value={String(prefs.refreshMinutes)}
+                  onChange={(v) => save({ refreshMinutes: Number(v) })}
+                  options={[10, 12, 15].map((n) => ({ value: String(n), label: t("settings.minutes", { n }) }))}
+                />
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                <dt className="text-muted">{t("settings.lastUpdate")}</dt>
+                <dd className="text-fg">{status?.lastSuccessAt ? formatDateTime(status.lastSuccessAt, lang, now) : "—"}</dd>
+                <dt className="text-muted">{t("settings.nextUpdate")}</dt>
+                <dd className="text-fg">{status?.nextRunAt ? formatDateTime(status.nextRunAt, lang, now) : "—"}</dd>
+              </dl>
+              <StatusIndicator />
+            </div>
+          )}
+        </Card>
+
+        <Card title={t("settings.interests")} hint={t("settings.interestsHint")}>
+          {prefs &&
+            SECTIONS.map((s) => (
+              <div key={s.id} className="mb-4 last:mb-0">
+                <h3 className="mb-2 text-sm font-semibold text-muted">{s[lang]}</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {categoriesFor(s.id).map((c) => (
+                    <ToggleChip key={c.id} active={prefs.interests.includes(c.id)} onClick={() => save({ interests: toggleIn(prefs.interests, c.id) })}>
+                      {c[lang]}
+                    </ToggleChip>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </Card>
+
+        <Card title={t("settings.companies")} hint={t("settings.companiesHint")}>
+          {prefs && (
+            <div className="flex flex-wrap gap-1.5">
+              {COMPANIES.map((c) => (
+                <ToggleChip key={c.id} active={prefs.followedCompanies.includes(c.id)} onClick={() => save({ followedCompanies: toggleIn(prefs.followedCompanies, c.id) })}>
+                  {c[lang]}
+                </ToggleChip>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title={t("settings.content")}>
+          {prefs && (
+            <div className="divide-y divide-line">
+              <Switch id="show-reviews" checked={prefs.showReviews} onChange={(v) => save({ showReviews: v })} label={t("settings.showReviews")} hint={t("settings.showReviewsHint")} />
+              <Switch id="tech-policy" checked={prefs.includeTechPolicy} onChange={(v) => save({ includeTechPolicy: v })} label={t("settings.techPolicy")} hint={t("settings.techPolicyHint")} />
+            </div>
+          )}
+        </Card>
+
+        <Card title={t("settings.ai")}>
+          {status && (
+            <div className="space-y-2 text-sm">
+              <p className={status.ai.configured ? "text-ok" : "text-fg"}>
+                {status.ai.configured ? t("settings.aiOn", { model: status.ai.model ?? status.ai.provider }) : t("settings.aiOff")}
+              </p>
+              {!status.ai.configured && <p className="text-muted">{t("settings.aiHowTo")}</p>}
+              {status.ai.configured && <p className="text-muted">{t("settings.aiPending", { n: status.ai.pending })}</p>}
+              {status.ai.lastError && <p className="text-caution">{t("settings.aiError", { e: status.ai.lastError })}</p>}
+              <p className="text-muted">{t("settings.aiAccuracy")}</p>
+            </div>
+          )}
+        </Card>
+
+        <Card title={t("settings.data")}>
+          {prefs && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="font-medium text-fg">{t("settings.retention")}</span>
+                <select
+                  className="h-9 rounded-md border border-line bg-surface px-2.5 text-sm"
+                  value={prefs.retentionDays}
+                  onChange={(e) => save({ retentionDays: Number(e.target.value) })}
+                >
+                  {[7, 14, 30, 60, 90].map((n) => (
+                    <option key={n} value={n}>
+                      {t("settings.days", { n })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-sm text-muted">{t("settings.timesExplained")}</p>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="mt-5">
+        <Card title={t("settings.sources")} hint={t("settings.sourcesHint")}>
+          <ul className="divide-y divide-line">
+            {(sources ?? []).map((s) => {
+              const state = !s.lastAttemptAt ? "pending" : s.lastStatus === "blocked" ? "blocked" : s.lastStatus === "error" ? "error" : "ok";
+              const dot = { ok: "bg-ok", error: "bg-caution", blocked: "bg-breaking", pending: "bg-subtle" }[state];
+              const label = { ok: t("sources.ok"), error: t("sources.error"), blocked: t("sources.blocked"), pending: t("sources.pending") }[state];
+              return (
+                <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <a href={s.homepage} target="_blank" rel="noopener noreferrer" lang="en" className="font-medium text-fg hover:text-accent">
+                        {s.name}
+                      </a>
+                      {s.kind === "official" && (
+                        <span className="inline-flex items-center gap-0.5 text-xs text-ok">
+                          <BadgeCheck className="size-3.5" aria-hidden />
+                          {t("sources.official")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={`inline-block size-2 rounded-full ${dot}`} aria-hidden />
+                        {label}
+                      </span>
+                      {s.lastSuccessAt && <span>{t("sources.lastSuccess", { time: formatRelative(s.lastSuccessAt, lang, now) })}</span>}
+                      <span>{t("sources.articles", { n: s.articleCount })}</span>
+                      {!s.aiAllowed && <span className="text-caution">{t("sources.noAi")}</span>}
+                    </p>
+                    {state === "error" && s.lastError && (
+                      <p className="mt-0.5 text-xs text-caution" lang="en" dir="ltr">
+                        {s.lastError}
+                      </p>
+                    )}
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-sm text-muted">
+                    <input type="checkbox" checked={s.enabled} onChange={(e) => toggleSource(s.id, e.target.checked)} className="size-4 accent-[var(--accent)]" />
+                    {t("sources.enabled")}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      </div>
+    </>
+  );
+}
