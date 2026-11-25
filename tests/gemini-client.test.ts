@@ -53,6 +53,8 @@ beforeAll(async () => {
   process.env.GEMINI_API_KEY = "test-gemini-key";
   process.env.GEMINI_MIN_INTERVAL_MS = "0";
   process.env.GEMINI_RETRY_DELAY_MS = "0";
+  // Fixed list so the tests check the fallback mechanism, not the default order.
+  process.env.GEMINI_FALLBACK_MODELS = "gemini-3.5-flash-lite";
 });
 afterAll(() => server.close());
 beforeEach(async () => {

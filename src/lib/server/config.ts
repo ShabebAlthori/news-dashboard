@@ -50,7 +50,7 @@ export const config = {
     geminiApiKey: process.env.GEMINI_API_KEY || "",
     geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
     /** Comma-separated, tried in order when the main model is busy or out of free quota. */
-    geminiFallbackModels: (process.env.GEMINI_FALLBACK_MODELS ?? process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.1-flash-lite")
+    geminiFallbackModels: (process.env.GEMINI_FALLBACK_MODELS ?? process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite")
       .split(",")
       .map((m) => m.trim())
       .filter(Boolean),
