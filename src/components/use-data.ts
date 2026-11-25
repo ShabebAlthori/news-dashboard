@@ -13,17 +13,3 @@ export function useHasNewer(generatedAt: string | undefined): boolean {
   if (!generatedAt || !data?.lastSuccessAt) return false;
   return new Date(data.lastSuccessAt).getTime() > new Date(generatedAt).getTime() + 1000;
 }
-
-export async function postJson(url: string, body: unknown): Promise<Response> {
-  return fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-}
-
-export function markRead(articleId: number) {
-  try {
-    const blob = new Blob([JSON.stringify({ articleId })], { type: "application/json" });
-    if (navigator.sendBeacon?.("/api/read", blob)) return;
-  } catch {
-    // fall through
-  }
-  void fetch("/api/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ articleId }), keepalive: true });
-}

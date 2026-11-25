@@ -12,6 +12,8 @@ export interface CoverageRef {
   publishedAt: string | null;
   fetchedAt: string;
   official: boolean;
+  /** The publisher's own excerpt for this article (used when stories are not grouped). */
+  excerpt?: string | null;
 }
 
 export type SummaryOrigin = "ai" | "feed" | "none";
@@ -129,3 +131,26 @@ export const DEFAULT_PREFS: Prefs = {
   refreshMinutes: 12,
   retentionDays: 30,
 };
+
+// ---------------------------------------------------------------------------
+// Web edition (static hosting): the whole dataset ships as one JSON snapshot.
+
+/** A story plus the raw ranking inputs, so the browser can rank with the reader's own preferences. */
+export interface SnapshotStory extends Story {
+  sortTime: number; // first publication (or retrieval) time, ms
+  lastActivity: number; // latest publication time in the cluster, ms
+  firstPublishedAt: number | null;
+  significance: number;
+  baseScore: number; // importance without the reader-relevance component
+  policy: boolean;
+}
+
+export interface Snapshot {
+  version: 1;
+  generatedAt: string;
+  retentionDays: number;
+  status: StatusResponse;
+  sources: SourceHealth[];
+  defaultPrefs: Prefs;
+  stories: SnapshotStory[];
+}

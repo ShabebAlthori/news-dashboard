@@ -36,6 +36,7 @@ export function defaultPrefs(): Prefs {
     interests: [...CATEGORY_IDS],
     followedCompanies: COMPANIES.filter((c) => c.core).map((c) => c.id),
     refreshMinutes: config.refreshMinutesDefault,
+    retentionDays: config.retentionDaysDefault,
   };
 }
 

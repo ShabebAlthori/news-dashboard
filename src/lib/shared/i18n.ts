@@ -31,6 +31,11 @@ const en = {
   "status.newAvailable": "New stories are available",
   "status.show": "Show",
   "status.lastUpdateAt": "Last successful update: {time}",
+  "status.staticNote": "Feeds update automatically about every 15 minutes.",
+  "status.checkUpdates": "Check for updates",
+  "settings.staticUpdates": "This web edition updates itself automatically about every 15 minutes, even when your computer is off.",
+  "settings.aiHowToStatic": "To turn them on, add a repository secret named ANTHROPIC_API_KEY on GitHub (Settings → Secrets and variables → Actions). The next update will start summarizing.",
+  "settings.localData": "Saved stories, read history and these settings are stored only in this browser on this device.",
 
   "dash.title": "Your briefing",
   "dash.top": "Top stories",
@@ -224,6 +229,11 @@ const ar: Record<I18nKey, Entry> = {
   "status.newAvailable": "تتوفر أخبار جديدة",
   "status.show": "اعرضها",
   "status.lastUpdateAt": "آخر تحديث ناجح: {time}",
+  "status.staticNote": "تُحدَّث الأخبار تلقائيًا كل 15 دقيقة تقريبًا.",
+  "status.checkUpdates": "التحقق من التحديثات",
+  "settings.staticUpdates": "تُحدِّث النسخة الإلكترونية نفسها تلقائيًا كل 15 دقيقة تقريبًا، حتى عندما يكون حاسوبك مطفأً.",
+  "settings.aiHowToStatic": "لتفعيلها، أضف سرًّا باسم ANTHROPIC_API_KEY إلى المستودع على GitHub (الإعدادات ← Secrets and variables ← Actions)، وسيبدأ التلخيص مع التحديث التالي.",
+  "settings.localData": "تُحفظ الأخبار المحفوظة وسجل القراءة وهذه الإعدادات في هذا المتصفح على هذا الجهاز فقط.",
 
   "dash.title": "موجزك",
   "dash.top": "أبرز الأخبار",

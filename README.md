@@ -21,18 +21,47 @@ It is built to answer, in one screen:
 
 ---
 
+## Web edition — open it, nothing to install
+
+**<https://shabebalthori.github.io/news-dashboard/>**
+
+The web edition is a free, always-on copy of the dashboard hosted on GitHub Pages. Open it on a phone or a computer; there is nothing to install or run.
+
+- **Automatic updates.** A GitHub Actions workflow ([`.github/workflows/web-edition.yml`](.github/workflows/web-edition.yml)) runs about every 15 minutes, even when your computer is off. Each run fetches the feeds, deduplicates, clusters, scores and (optionally) summarizes the news, then publishes the result. GitHub sometimes starts scheduled runs a few minutes late.
+- **Same features.** All pages, filters, search, Arabic/English, dark mode and importance ranking work as in the self-hosted version. Ranking and search run in your browser over the latest published data (the last 7 days).
+- **Your data stays in your browser.** Saved stories, read history (used by "You might have missed") and settings are kept in the browser's storage on each device, not on GitHub.
+- **AI summaries and Arabic translation.** On GitHub, open **Settings → Secrets and variables → Actions → New repository secret** and add `ANTHROPIC_API_KEY`. Optionally add a *variable* `ANTHROPIC_MODEL` (for example `claude-haiku-5-5` for much lower cost) and `AI_DAILY_LIMIT`. The next run starts summarizing. Without a key, the page shows the publishers' own excerpts.
+- **Visibility.** GitHub Pages sites from free accounts are public, so anyone with the link can open the page. It asks search engines not to index it. No keys or passwords are ever published.
+- **Manual update.** Open the **Actions** tab → **Web edition** → **Run workflow**.
+- **Schedule pauses.** GitHub pauses schedules after 60 days without repository activity. The workflow makes an empty commit when needed to keep it running.
+
+To build the web edition yourself:
+
+```bash
+BASE_PATH=/news-dashboard npm run build:static
+```
+
+```bash
+npm run export:static
+```
+
+The first command writes the site to `out/`; the second refreshes feeds and writes `out/data/`.
+
+---
+
 ## Contents
 
 1. [Quick start](#quick-start)
-2. [Features](#features)
-3. [How it works](#how-it-works)
-4. [AI summaries & translation](#ai-summaries--translation) — why a key is needed, costs, free alternatives
-5. [Sources and compliance](#sources-and-compliance)
-6. [Configuration](#configuration)
-7. [Deployment](#deployment)
-8. [Testing](#testing)
-9. [Project structure](#project-structure)
-10. [Troubleshooting](#troubleshooting)
+2. [Web edition](#web-edition--open-it-nothing-to-install)
+3. [Features](#features)
+4. [How it works](#how-it-works)
+5. [AI summaries & translation](#ai-summaries--translation) — why a key is needed, costs, free alternatives
+6. [Sources and compliance](#sources-and-compliance)
+7. [Configuration](#configuration)
+8. [Deployment](#deployment)
+9. [Testing](#testing)
+10. [Project structure](#project-structure)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -290,7 +319,7 @@ npm run typecheck
 npm run lint
 ```
 
-49 automated tests cover:
+54 automated tests cover:
 
 - feed parsing (RSS 2.0, Atom, RDF, missing dates)
 - text cleanup (decimals, entities, tracking parameters)
@@ -303,6 +332,7 @@ npm run lint
 - search query building (including Arabic synonyms)
 - Arabic plural forms
 - the Claude and Ollama clients against local mock servers
+- the web edition's in-browser ranking, filters, Arabic search, saved stories and dashboard
 - a full pipeline run with a mocked network (cross-feed deduplication, clustering, an outage that preserves articles, rejection of a summary with an invented number, AI exclusion, dashboard and search)
 
 During development the app was also checked in a real browser (Playwright):
@@ -321,7 +351,9 @@ During development the app was also checked in a real browser (Playwright):
 src/
   app/                    Pages (dashboard, latest, technology, gaming, companies, search, saved, settings) and API routes
   components/             Client UI: app shell, story card, feed + filters, dashboard, settings
-  lib/shared/             Client-safe code: taxonomy, i18n (en/ar), formatting, types
+  lib/shared/             Client-safe code: taxonomy, i18n (en/ar), formatting, types, scoring, search,
+                          rank.ts (in-browser ranking for the web edition)
+  lib/client/             Web-edition data layer (static snapshot + browser storage) and shared actions
   lib/server/             Server-only code
     sources.ts            Feed registry (with reasons for exclusions)
     fetcher.ts robots.ts  Polite fetching
@@ -333,7 +365,9 @@ src/
     queries.ts            Story listing, dashboard, search
   instrumentation.ts      Starts the scheduler with the server
   proxy.ts                Optional Basic auth
-scripts/                  refresh.ts (one-off), worker.ts (standalone scheduler)
+scripts/                  refresh.ts (one-off), worker.ts (standalone scheduler),
+                          build-static.mjs + export-static.ts (web edition)
+.github/workflows/        web-edition.yml (GitHub Pages, every ~15 minutes)
 tests/                    Vitest suites
 ```
 

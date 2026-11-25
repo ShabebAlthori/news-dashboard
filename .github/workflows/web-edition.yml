@@ -1,0 +1,100 @@
+# Publishes the web edition to GitHub Pages and keeps it up to date.
+# Every run: fetch all feeds → cluster, score and (optionally) summarize → build static site → deploy.
+# The news database is carried between runs with the Actions cache.
+name: Web edition
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # refresh news (GitHub may start scheduled runs a few minutes late)
+    - cron: "41 3 * * *" # daily: also keep the schedule active (see keepalive job)
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-edition
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Runs only once the repository is public (free GitHub Pages and unlimited Actions minutes).
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Restore news database
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: news-db-${{ github.run_id }}
+          restore-keys: news-db-
+
+      - name: Build static site
+        run: npm run build:static
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+
+      - name: Refresh feeds and write data files
+        run: npm run export:static
+        env:
+          RETENTION_DAYS: "14"
+          SNAPSHOT_DAYS: "7"
+          # Optional: add an ANTHROPIC_API_KEY repository secret for AI summaries and Arabic translation.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-opus-5-5' }}
+          AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '200' }}
+
+      - name: Save news database
+        if: success() || failure()
+        uses: actions/cache/save@v6
+        with:
+          path: data
+          key: news-db-${{ github.run_id }}
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  # GitHub pauses scheduled workflows in public repositories after 60 days without
+  # activity. Once a day, if the last commit is older than 50 days, add an empty commit.
+  keepalive:
+    if: ${{ !github.event.repository.private && github.event_name == 'schedule' && github.event.schedule == '41 3 * * *' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Keep scheduled updates active
+        run: |
+          last=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - last )) -gt $(( 50 * 86400 )) ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Keep scheduled news updates active"
+            git push
+          fi

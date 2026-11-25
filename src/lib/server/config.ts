@@ -38,6 +38,7 @@ export const config = {
     ")",
   /** Only ingest items published within this many days (older items in a feed are ignored). */
   ingestMaxAgeDays: int("INGEST_MAX_AGE_DAYS", 7, 1, 30),
+  retentionDaysDefault: int("RETENTION_DAYS", 30, 3, 365),
   ai: {
     provider: resolveProvider(),
     anthropicModel: process.env.ANTHROPIC_MODEL || "claude-opus-5-5",

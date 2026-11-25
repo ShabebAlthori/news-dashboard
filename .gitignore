@@ -43,3 +43,7 @@ next-env.d.ts
 
 # local database
 /data/
+
+# static web edition build output
+/out/
+/.static-build-stash/

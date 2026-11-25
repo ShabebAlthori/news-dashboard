@@ -8,7 +8,7 @@ import { formatDateTime, formatRelative } from "@/lib/shared/format";
 import { categoryById, companyById, EVENT_LABELS, SECTIONS } from "@/lib/shared/taxonomy";
 import type { Lang, Story } from "@/lib/shared/types";
 import { useNow, useUi } from "./providers";
-import { markRead, postJson } from "./use-data";
+import { markRead, saveStory } from "@/lib/client/actions";
 
 const TIER_BARS = { minor: 1, standard: 2, notable: 3, major: 4 } as const;
 
@@ -142,8 +142,8 @@ export function StoryCard({
   async function toggleSave() {
     const next = !saved;
     setSaved(next);
-    const res = await postJson("/api/saved", { articleId: story.leadArticleId, saved: next });
-    if (!res.ok) setSaved(!next);
+    const ok = await saveStory(story, next);
+    if (!ok) setSaved(!next);
     await mutate((key) => typeof key === "string" && key.includes("saved=1"));
   }
 
@@ -180,7 +180,7 @@ export function StoryCard({
                 href={story.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => markRead(story.leadArticleId)}
+                onClick={() => markRead(story.leadArticleId, story.url)}
                 className="decoration-accent/60 decoration-2 underline-offset-4 hover:underline"
               >
                 {headline}
@@ -253,7 +253,7 @@ export function StoryCard({
               href={story.url}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => markRead(story.leadArticleId)}
+              onClick={() => markRead(story.leadArticleId, story.url)}
               className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-fg hover:bg-surface-2"
             >
               <ExternalLink className="size-3.5 rtl:-scale-x-100" aria-hidden />
@@ -304,7 +304,7 @@ export function StoryCard({
                           href={c.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={() => markRead(c.articleId)}
+                          onClick={() => markRead(c.articleId, c.url)}
                           lang="en"
                           dir="ltr"
                           className="mt-0.5 block text-muted hover:text-accent hover:underline"
@@ -341,7 +341,7 @@ export function StoryCard({
         {variant === "lead" && showImage && story.imageUrl && (
           <div className="order-first overflow-hidden rounded-lg bg-surface-2 md:order-none">
             {/* eslint-disable-next-line @next/next/no-img-element -- publisher-hosted thumbnails from many domains */}
-            <img src={story.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[16/10] size-full object-cover" />
+            <img src={story.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[16/9] max-h-48 w-full object-cover sm:max-h-64 md:aspect-[16/10] md:size-full md:max-h-none" />
           </div>
         )}
       </div>

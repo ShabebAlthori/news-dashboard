@@ -1,0 +1,41 @@
+// Refreshes all feeds, then writes the web edition's data files:
+//   out/data/snapshot.json  — every story of the last SNAPSHOT_DAYS days (default 7)
+//   out/data/status.json    — last update time, source health and AI status (polled by the page)
+// Usage: npm run export:static [-- <output dir>] [--no-refresh]
+import fs from "node:fs";
+import path from "node:path";
+import { runRefresh } from "../src/lib/server/pipeline";
+import { exportSnapshotStories } from "../src/lib/server/queries";
+import { defaultPrefs } from "../src/lib/server/settings";
+import { getSourcesHealth, getStatus } from "../src/lib/server/status";
+import type { Snapshot } from "../src/lib/shared/types";
+
+async function main() {
+  const args = process.argv.slice(2);
+  const outDir = path.resolve(args.find((a) => !a.startsWith("--")) ?? "out/data");
+  const days = Math.min(30, Math.max(1, Number(process.env.SNAPSHOT_DAYS ?? 7)));
+
+  if (!args.includes("--no-refresh")) {
+    const result = await runRefresh("cron");
+    console.log(JSON.stringify(result));
+  }
+
+  const status = { ...getStatus(), running: false, nextRunAt: null };
+  const sources = getSourcesHealth();
+  const stories = exportSnapshotStories(days);
+  // Written after the refresh finished, so the page never thinks a newer update exists.
+  const generatedAt = new Date().toISOString();
+  const snapshot: Snapshot = { version: 1, generatedAt, retentionDays: days, status, sources, defaultPrefs: defaultPrefs(), stories };
+
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, "snapshot.json"), JSON.stringify(snapshot));
+  fs.writeFileSync(path.join(outDir, "status.json"), JSON.stringify({ generatedAt, status, sources }));
+  const kb = Math.round(fs.statSync(path.join(outDir, "snapshot.json")).size / 1024);
+  console.log(`Wrote ${stories.length} stories (${kb} KB) to ${outDir}`);
+  if (!status.lastSuccessAt && stories.length === 0) process.exit(1);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

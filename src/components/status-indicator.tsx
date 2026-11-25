@@ -5,6 +5,8 @@ import { useState } from "react";
 import { mutate } from "swr";
 import { formatDateTime, formatRelative } from "@/lib/shared/format";
 import { useNow, useUi } from "./providers";
+import { requestRefresh } from "@/lib/client/actions";
+import { IS_STATIC } from "@/lib/client/mode";
 import { useStatus } from "./use-data";
 
 export function StatusIndicator({ compact = false }: { compact?: boolean }) {
@@ -23,9 +25,14 @@ export function StatusIndicator({ compact = false }: { compact?: boolean }) {
     setBusy(true);
     setNote(null);
     try {
-      const res = await fetch("/api/refresh", { method: "POST" });
-      if (res.status === 429) setNote(t("status.tooSoon"));
-      else setNote(t("status.started"));
+      const outcome = await requestRefresh();
+      if (outcome === "checked") {
+        // Web edition: feeds refresh on a schedule; reload whatever was published since.
+        await mutate((key) => typeof key === "string" && key.startsWith("/api/"), undefined, { revalidate: true });
+        setNote(t("status.staticNote"));
+        return;
+      }
+      setNote(outcome === "too-soon" ? t("status.tooSoon") : t("status.started"));
       await mutate("/api/status");
       // Poll until the run finishes, then refresh every list on screen.
       for (let i = 0; i < 40; i++) {
@@ -58,7 +65,7 @@ export function StatusIndicator({ compact = false }: { compact?: boolean }) {
           className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-fg hover:bg-surface-2 disabled:opacity-60"
         >
           <RefreshCw className={`size-3.5 ${running ? "animate-spin" : ""}`} aria-hidden />
-          {t("status.refreshNow")}
+          {IS_STATIC ? t("status.checkUpdates") : t("status.refreshNow")}
         </button>
       )}
       {!compact && note && <p className="text-xs text-muted">{note}</p>}

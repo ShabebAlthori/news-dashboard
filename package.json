@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "refresh": "tsx scripts/refresh.ts",
-    "worker": "tsx scripts/worker.ts"
+    "worker": "tsx scripts/worker.ts",
+    "build:static": "node scripts/build-static.mjs",
+    "export:static": "tsx scripts/export-static.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",

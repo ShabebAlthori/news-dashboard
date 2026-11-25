@@ -10,6 +10,8 @@ import { Segmented, Switch } from "./controls";
 import { useNow, useUi, type ThemePref } from "./providers";
 import { PageHeader } from "./states";
 import { StatusIndicator } from "./status-indicator";
+import { savePrefs, setSourceEnabled } from "@/lib/client/actions";
+import { IS_STATIC } from "@/lib/client/mode";
 import { useStatus } from "./use-data";
 
 function Card({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
@@ -47,11 +49,7 @@ export function SettingsView() {
     if (!prefs) return;
     const optimistic = { ...prefs, ...patch };
     await mutatePrefs(
-      async () => {
-        const res = await fetch("/api/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
-        if (!res.ok) throw new Error("save failed");
-        return (await res.json()) as Prefs;
-      },
+      () => savePrefs(patch),
       { optimisticData: optimistic, rollbackOnError: true, revalidate: false },
     ).then(
       () => setMessage(t("settings.saved")),
@@ -61,8 +59,8 @@ export function SettingsView() {
   }
 
   async function toggleSource(id: string, enabled: boolean) {
-    const res = await fetch("/api/sources", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, enabled }) });
-    if (res.ok) await mutateSources(await res.json(), { revalidate: false });
+    const next = await setSourceEnabled(id, enabled);
+    if (next) await mutateSources(next as SourceHealth[], { revalidate: false });
   }
 
   const toggleIn = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -105,15 +103,19 @@ export function SettingsView() {
         <Card title={t("settings.updates")}>
           {prefs && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="font-medium text-fg">{t("settings.interval")}</span>
-                <Segmented
-                  label={t("settings.interval")}
-                  value={String(prefs.refreshMinutes)}
-                  onChange={(v) => save({ refreshMinutes: Number(v) })}
-                  options={[10, 12, 15].map((n) => ({ value: String(n), label: t("settings.minutes", { n }) }))}
-                />
-              </div>
+              {IS_STATIC ? (
+                <p className="text-sm text-muted">{t("settings.staticUpdates")}</p>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="font-medium text-fg">{t("settings.interval")}</span>
+                  <Segmented
+                    label={t("settings.interval")}
+                    value={String(prefs.refreshMinutes)}
+                    onChange={(v) => save({ refreshMinutes: Number(v) })}
+                    options={[10, 12, 15].map((n) => ({ value: String(n), label: t("settings.minutes", { n }) }))}
+                  />
+                </div>
+              )}
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
                 <dt className="text-muted">{t("settings.lastUpdate")}</dt>
                 <dd className="text-fg">{status?.lastSuccessAt ? formatDateTime(status.lastSuccessAt, lang, now) : "—"}</dd>
@@ -168,7 +170,7 @@ export function SettingsView() {
               <p className={status.ai.configured ? "text-ok" : "text-fg"}>
                 {status.ai.configured ? t("settings.aiOn", { model: status.ai.model ?? status.ai.provider }) : t("settings.aiOff")}
               </p>
-              {!status.ai.configured && <p className="text-muted">{t("settings.aiHowTo")}</p>}
+              {!status.ai.configured && <p className="text-muted">{t(IS_STATIC ? "settings.aiHowToStatic" : "settings.aiHowTo")}</p>}
               {status.ai.configured && <p className="text-muted">{t("settings.aiPending", { n: status.ai.pending })}</p>}
               {status.ai.lastError && <p className="text-caution">{t("settings.aiError", { e: status.ai.lastError })}</p>}
               <p className="text-muted">{t("settings.aiAccuracy")}</p>
@@ -179,20 +181,24 @@ export function SettingsView() {
         <Card title={t("settings.data")}>
           {prefs && (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="font-medium text-fg">{t("settings.retention")}</span>
-                <select
-                  className="h-9 rounded-md border border-line bg-surface px-2.5 text-sm"
-                  value={prefs.retentionDays}
-                  onChange={(e) => save({ retentionDays: Number(e.target.value) })}
-                >
-                  {[7, 14, 30, 60, 90].map((n) => (
-                    <option key={n} value={n}>
-                      {t("settings.days", { n })}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {IS_STATIC ? (
+                <p className="text-sm text-muted">{t("settings.localData")}</p>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="font-medium text-fg">{t("settings.retention")}</span>
+                  <select
+                    className="h-9 rounded-md border border-line bg-surface px-2.5 text-sm"
+                    value={prefs.retentionDays}
+                    onChange={(e) => save({ retentionDays: Number(e.target.value) })}
+                  >
+                    {[7, 14, 30, 60, 90].map((n) => (
+                      <option key={n} value={n}>
+                        {t("settings.days", { n })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <p className="text-sm text-muted">{t("settings.timesExplained")}</p>
             </div>
           )}
@@ -235,10 +241,12 @@ export function SettingsView() {
                       </p>
                     )}
                   </div>
-                  <label className="inline-flex items-center gap-2 text-sm text-muted">
-                    <input type="checkbox" checked={s.enabled} onChange={(e) => toggleSource(s.id, e.target.checked)} className="size-4 accent-[var(--accent)]" />
-                    {t("sources.enabled")}
-                  </label>
+                  {!IS_STATIC && (
+                    <label className="inline-flex items-center gap-2 text-sm text-muted">
+                      <input type="checkbox" checked={s.enabled} onChange={(e) => toggleSource(s.id, e.target.checked)} className="size-4 accent-[var(--accent)]" />
+                      {t("sources.enabled")}
+                    </label>
+                  )}
                 </li>
               );
             })}

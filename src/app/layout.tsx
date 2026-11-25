@@ -28,7 +28,25 @@ export const viewport: Viewport = {
 // Resolves "system" before first paint so there is no light/dark flash.
 const THEME_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )theme=([^;]*)/);var t=m?decodeURIComponent(m[1]):"system";var d=t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d)}catch(e){}})()`;
 
+// Web edition: language (cookie, else the browser's language) and theme are applied before paint.
+const STATIC_BOOT_SCRIPT = `(function(){try{var d=document.documentElement;var c=function(n){var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)"));return m?decodeURIComponent(m[1]):null};var l=c("lang");if(l!=="ar"&&l!=="en"){l=/^ar\\b/i.test(navigator.language||"")?"ar":"en"}d.lang=l;d.dir=l==="ar"?"rtl":"ltr";var t=c("theme")||"system";d.classList.toggle("dark",t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches))}catch(e){}})()`;
+
 export default async function RootLayout({ children }: LayoutProps<"/">) {
+  if (process.env.NEXT_PUBLIC_STATIC === "1") {
+    return (
+      <html lang="en" dir="ltr" suppressHydrationWarning>
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: STATIC_BOOT_SCRIPT }} />
+        </head>
+        <body className="min-h-dvh">
+          <Providers initialLang={null} initialTheme="system">
+            <AppShell>{children}</AppShell>
+          </Providers>
+        </body>
+      </html>
+    );
+  }
+
   const store = await cookies();
   const cookieLang = store.get("lang")?.value;
   let lang: Lang;

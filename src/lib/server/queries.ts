@@ -1,8 +1,9 @@
 import type Database from "better-sqlite3";
 import { COMPANIES, type EventType, type Section } from "@/lib/shared/taxonomy";
-import type { CompanyPulse, CoverageRef, DashboardResponse, Prefs, Story, StoriesResponse } from "@/lib/shared/types";
+import type { CompanyPulse, CoverageRef, DashboardResponse, Prefs, SnapshotStory, Story, StoriesResponse } from "@/lib/shared/types";
 import { getDb, parseJsonArray } from "./db";
 import { coverageFactor, finalScore, impactFactor, isBreaking, relevanceFactor, tier, type RelevancePrefs } from "./scoring";
+import { searchTerms } from "@/lib/shared/search";
 import { getPrefs } from "./settings";
 import { SOURCES, sourceById } from "./sources";
 
@@ -116,6 +117,7 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
         publishedAt: iso(m.published_at),
         fetchedAt: iso(m.fetched_at)!,
         official: src?.kind === "official",
+        excerpt: m.summary_en,
       };
     });
     const src = sourceById(lead.source_id);
@@ -174,7 +176,7 @@ interface Candidate extends ClusterRow {
   relevance: number;
 }
 
-function candidates(db: Database.Database, q: StoryQuery, prefs: Prefs): Candidate[] {
+function candidates(db: Database.Database, q: StoryQuery, prefs: Prefs, opts: { raw?: boolean } = {}): Candidate[] {
   const where: string[] = ["c.excluded = 0", "c.lead_article_id IS NOT NULL"];
   const params: unknown[] = [];
   if (q.from != null) {
@@ -197,8 +199,8 @@ function candidates(db: Database.Database, q: StoryQuery, prefs: Prefs): Candida
     where.push("c.companies LIKE ?");
     params.push(`%"${q.company}"%`);
   }
-  if (!prefs.showReviews) where.push("c.event_type NOT IN ('review', 'opinion')");
-  if (!prefs.includeTechPolicy) where.push("c.policy = 0");
+  if (!opts.raw && !prefs.showReviews) where.push("c.event_type NOT IN ('review', 'opinion')");
+  if (!opts.raw && !prefs.includeTechPolicy) where.push("c.policy = 0");
   if (q.savedOnly) where.push("c.id IN (SELECT a.cluster_id FROM saved s JOIN articles a ON a.id = s.article_id)");
   if (q.q && q.q.trim()) {
     const match = toFtsQuery(q.q);
@@ -222,43 +224,11 @@ function candidates(db: Database.Database, q: StoryQuery, prefs: Prefs): Candida
   });
 }
 
-// Arabic search terms that should also match English source text.
-const ARABIC_SYNONYMS: Record<string, string[]> = {
-  ...Object.fromEntries(COMPANIES.filter((c) => /[؀-ۿ]/.test(c.ar)).flatMap((c) => c.ar.split(/\s*\/\s*/).map((ar) => [ar, [c.en.split(" ")[0]]]))),
-  غوغل: ["Google"],
-  أبل: ["Apple"],
-  انفيديا: ["Nvidia"],
-  ذكاء: ["AI"],
-  الذكاء: ["AI"],
-  ألعاب: ["game"],
-  الألعاب: ["game"],
-  لعبة: ["game"],
-  هاتف: ["phone"],
-  معالج: ["processor", "CPU"],
-  رقاقات: ["chip"],
-  اختراق: ["hack", "breach"],
-  ثغرة: ["vulnerability", "flaw"],
-  استحواذ: ["acquire", "acquisition"],
-  تسريح: ["layoffs"],
-  أرباح: ["earnings"],
-};
-
-/** Convert free text into a safe FTS5 prefix query. */
+/** Convert free text into a safe FTS5 prefix query (Arabic terms also match English synonyms). */
 export function toFtsQuery(input: string): string | null {
-  const terms = input
-    .normalize("NFKC")
-    .split(/\s+/)
-    .map((t) => t.replace(/["*^():{}[\]\\]/g, "").trim())
-    .filter((t) => t.length > 0)
-    .slice(0, 8);
+  const terms = searchTerms(input);
   if (!terms.length) return null;
-  return terms
-    .map((t) => {
-      const synonyms = ARABIC_SYNONYMS[t] ?? ARABIC_SYNONYMS[t.replace(/^ال/, "")];
-      if (!synonyms) return `"${t}"*`;
-      return `(${[t, ...synonyms].map((s) => `"${s}"*`).join(" OR ")})`;
-    })
-    .join(" AND ");
+  return terms.map((alternatives) => (alternatives.length === 1 ? `"${alternatives[0]}"*` : `(${alternatives.map((s) => `"${s}"*`).join(" OR ")})`)).join(" AND ");
 }
 
 function sortCandidates(list: Candidate[], sort: "newest" | "importance") {
@@ -408,4 +378,32 @@ export function companyCounts(fromMs: number): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const c of list) for (const id of parseJsonArray(c.companies)) counts[id] = (counts[id] ?? 0) + 1;
   return counts;
+}
+
+/**
+ * Every visible story from the last `days` days with its raw ranking inputs, for the
+ * static web edition. Reader filters (reviews, policy) are applied in the browser.
+ */
+export function exportSnapshotStories(days: number, limit = 2500): SnapshotStory[] {
+  const db = getDb();
+  const prefs = getPrefs();
+  const now = Date.now();
+  const list = candidates(db, { from: now - days * 24 * HOUR }, prefs, { raw: true });
+  sortCandidates(list, "newest");
+  const page = list.slice(0, limit);
+  const byId = new Map(page.map((c) => [c.id, c]));
+  return hydrate(db, page, now, enabledSourceIds(db)).map((s) => {
+    const c = byId.get(s.id)!;
+    return {
+      ...s,
+      saved: false,
+      read: false,
+      sortTime: c.sort_time,
+      lastActivity: c.last_published_at ?? c.sort_time,
+      firstPublishedAt: c.first_published_at,
+      significance: c.significance,
+      baseScore: c.base_score,
+      policy: c.policy === 1,
+    };
+  });
 }
