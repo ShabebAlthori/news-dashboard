@@ -53,6 +53,7 @@ export const config = {
     geminiBaseUrl: (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, ""),
     /** Free-tier friendly spacing between Gemini requests. */
     geminiMinIntervalMs: int("GEMINI_MIN_INTERVAL_MS", 6500, 0, 60000),
+    geminiRetryDelayMs: int("GEMINI_RETRY_DELAY_MS", 8000, 0, 60000),
     maxPerRun: int("AI_MAX_ARTICLES_PER_RUN", 30, 0, 500),
     dailyLimit: int("AI_DAILY_LIMIT", 200, 0, 10000),
     concurrency: int("AI_CONCURRENCY", 3, 1, 10),

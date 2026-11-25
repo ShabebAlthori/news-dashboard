@@ -52,6 +52,7 @@ beforeAll(async () => {
   process.env.GEMINI_BASE_URL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   process.env.GEMINI_API_KEY = "test-gemini-key";
   process.env.GEMINI_MIN_INTERVAL_MS = "0";
+  process.env.GEMINI_RETRY_DELAY_MS = "0";
 });
 afterAll(() => server.close());
 beforeEach(async () => {
@@ -90,6 +91,22 @@ describe("summarizeWithGemini", () => {
       "gemini-3.5-flash-lite:generateContent",
       "gemini-3.5-flash-lite:generateContent",
     ]);
+  });
+
+  it("retries a temporarily overloaded model once, then uses the lighter model", async () => {
+    const { summarizeWithGemini } = await import("@/lib/server/ai/gemini");
+    const busy = { status: 503, json: { error: { code: 503, message: "This model is currently experiencing high demand." } } };
+    let calls = 0;
+    handler = () => (++calls === 1 ? busy : ok("gemini-3.8-flash"));
+    expect((await summarizeWithGemini(article)).model).toBe("gemini-3.8-flash");
+    expect(seen).toHaveLength(2); // retried the same model
+
+    seen.length = 0;
+    handler = (path) => (path.includes("gemini-3.8-flash") ? busy : ok("gemini-3.5-flash-lite"));
+    expect((await summarizeWithGemini(article)).model).toBe("gemini-3.5-flash-lite");
+    // Overload is temporary: the main model is tried again for the next story.
+    await summarizeWithGemini(article);
+    expect(seen[3].path).toContain("gemini-3.8-flash");
   });
 
   it("maps errors: quota → rate-limit, bad key → auth, unknown model → config, safety → refusal", async () => {

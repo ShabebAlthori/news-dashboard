@@ -102,15 +102,24 @@ export async function summarizeWithGemini(article: PromptArticle): Promise<{ out
   const models = modelsToTry();
   if (!models.length) throw new AiError("rate-limit", "Gemini free-tier quota used up for today");
   for (let i = 0; i < models.length; i++) {
-    try {
-      return await call(models[i], article);
-    } catch (err) {
-      const skippable = err instanceof AiError && (err.kind === "rate-limit" || (err.kind === "config" && err.message.includes("is not available")));
-      if (skippable && i < models.length - 1) {
-        quotaExhausted.add(models[i]);
-        continue;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await call(models[i], article);
+      } catch (err) {
+        if (!(err instanceof AiError)) throw err;
+        // "High demand" / 5xx overloads are usually brief: retry once, then try the lighter model.
+        const overloaded = err.kind === "unavailable" && /\b50[0234]\b|high demand|overloaded/i.test(err.message);
+        if (overloaded && attempt === 0) {
+          await new Promise((r) => setTimeout(r, config.ai.geminiRetryDelayMs));
+          continue;
+        }
+        const quotaOrMissing = err.kind === "rate-limit" || (err.kind === "config" && err.message.includes("is not available"));
+        if ((overloaded || quotaOrMissing) && i < models.length - 1) {
+          if (quotaOrMissing) quotaExhausted.add(models[i]); // skip it for the rest of the day
+          break; // next model
+        }
+        throw err;
       }
-      throw err;
     }
   }
   throw new AiError("rate-limit", "Gemini free-tier quota used up for today");
