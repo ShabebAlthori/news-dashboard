@@ -9,7 +9,7 @@ interface Seen {
   body: {
     systemInstruction: { parts: { text: string }[] };
     contents: { role: string; parts: { text: string }[] }[];
-    generationConfig: { responseMimeType: string; responseJsonSchema: Record<string, unknown>; maxOutputTokens: number; temperature?: number };
+    generationConfig: { responseMimeType: string; responseJsonSchema: Record<string, unknown>; maxOutputTokens: number; temperature?: number; thinkingConfig?: { thinkingLevel: string } };
   };
 }
 
@@ -78,6 +78,7 @@ describe("summarizeWithGemini", () => {
     expect(req.body.generationConfig.responseJsonSchema).not.toHaveProperty("$schema");
     expect(req.body.generationConfig.responseJsonSchema).toHaveProperty("properties.summary_ar");
     expect(req.body.generationConfig).not.toHaveProperty("temperature");
+    expect(req.body.generationConfig).toHaveProperty("thinkingConfig.thinkingLevel", "LOW");
   });
 
   it("falls back to the lighter model when the free quota of the main model is used up", async () => {
@@ -104,9 +105,19 @@ describe("summarizeWithGemini", () => {
     seen.length = 0;
     handler = (path) => (path.includes("gemini-3.8-flash") ? busy : ok("gemini-3.5-flash-lite"));
     expect((await summarizeWithGemini(article)).model).toBe("gemini-3.5-flash-lite");
-    // Overload is temporary: the main model is tried again for the next story.
+    // The busy model is rested for a while, so the next story goes straight to the lighter one.
     await summarizeWithGemini(article);
-    expect(seen[3].path).toContain("gemini-3.8-flash");
+    expect(seen[3].path).toContain("gemini-3.5-flash-lite");
+  });
+
+  it("resends without thinkingConfig if a model rejects it", async () => {
+    const { summarizeWithGemini } = await import("@/lib/server/ai/gemini");
+    handler = () =>
+      seen.at(-1)?.body.generationConfig.thinkingConfig
+        ? { status: 400, json: { error: { code: 400, message: "Thinking level is not supported for this model." } } }
+        : ok("gemini-3.8-flash");
+    expect((await summarizeWithGemini(article)).model).toBe("gemini-3.8-flash");
+    expect(seen.map((s) => Boolean(s.body.generationConfig.thinkingConfig))).toEqual([true, false]);
   });
 
   it("maps errors: quota → rate-limit, bad key → auth, unknown model → config, safety → refusal", async () => {
@@ -118,6 +129,7 @@ describe("summarizeWithGemini", () => {
     await expect(summarizeWithGemini(article)).rejects.toMatchObject({ kind: "auth" });
     handler = () => ({ status: 404, json: { error: { message: "models/x is not found" } } });
     await expect(summarizeWithGemini(article)).rejects.toMatchObject({ kind: "config", stopsRun: true });
+    resetGeminiState();
     handler = () => ({ status: 200, json: { candidates: [{ finishReason: "RECITATION" }] } });
     await expect(summarizeWithGemini(article)).rejects.toMatchObject({ kind: "refusal" });
   });

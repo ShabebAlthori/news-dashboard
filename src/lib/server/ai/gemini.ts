@@ -31,6 +31,11 @@ interface GeminiResponse {
 let lastCallAt = 0;
 let quotaExhausted = new Set<string>();
 let quotaDay = "";
+/** Models that kept answering "busy" (or timing out) are rested for a while. */
+let busyUntil = new Map<string, number>();
+const BUSY_REST_MS = 10 * 60_000;
+/** Set if the API rejects thinkingConfig for a model; then it is sent without it. */
+const noThinkingConfig = new Set<string>();
 
 async function pace() {
   const wait = lastCallAt + config.ai.geminiMinIntervalMs - Date.now();
@@ -44,7 +49,10 @@ function modelsToTry(): string[] {
     quotaDay = today;
     quotaExhausted = new Set();
   }
-  return [config.ai.geminiModel, ...config.ai.geminiFallbackModels].filter((m, i, all) => m && all.indexOf(m) === i && !quotaExhausted.has(m));
+  const now = Date.now();
+  return [config.ai.geminiModel, ...config.ai.geminiFallbackModels].filter(
+    (m, i, all) => m && all.indexOf(m) === i && !quotaExhausted.has(m) && (busyUntil.get(m) ?? 0) <= now,
+  );
 }
 
 async function call(model: string, article: PromptArticle): Promise<{ output: AiOutput; model: string }> {
@@ -57,12 +65,19 @@ async function call(model: string, article: PromptArticle): Promise<{ output: Ai
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: "user", parts: [{ text: buildUserMessage(article) }] }],
-        generationConfig: { responseMimeType: "application/json", responseJsonSchema, maxOutputTokens: 8192 },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseJsonSchema,
+          maxOutputTokens: 8192,
+          // Summarizing needs little reasoning; low thinking keeps requests fast and light.
+          ...(noThinkingConfig.has(model) ? {} : { thinkingConfig: { thinkingLevel: "LOW" } }),
+        },
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(60_000),
     });
-  } catch {
-    throw new AiError("unavailable", "Could not reach the Gemini API");
+  } catch (err) {
+    const timedOut = (err as Error).name === "TimeoutError";
+    throw new AiError("unavailable", timedOut ? `Gemini request timed out (${model})` : "Could not reach the Gemini API");
   }
 
   const body = (await res.json().catch(() => ({}))) as GeminiResponse;
@@ -71,6 +86,10 @@ async function call(model: string, article: PromptArticle): Promise<{ output: Ai
     if (res.status === 429) throw new AiError("rate-limit", `Gemini quota reached for ${model}${detail}`);
     if (res.status === 401 || res.status === 403) throw new AiError("auth", `Gemini API key is missing or invalid${detail}`);
     if (res.status === 404) throw new AiError("config", `Gemini model "${model}" is not available${detail}`);
+    if (res.status === 400 && /thinking/i.test(body.error?.message ?? "") && !noThinkingConfig.has(model)) {
+      noThinkingConfig.add(model);
+      return call(model, article); // this model does not accept thinkingConfig
+    }
     if (res.status === 400) throw new AiError("config", `Gemini rejected the request${detail}`);
     throw new AiError("unavailable", `Gemini API error ${res.status}${detail}`);
   }
@@ -100,29 +119,35 @@ async function call(model: string, article: PromptArticle): Promise<{ output: Ai
 export async function summarizeWithGemini(article: PromptArticle): Promise<{ output: AiOutput; model: string }> {
   if (!config.ai.geminiApiKey) throw new AiError("auth", "GEMINI_API_KEY is not set");
   const models = modelsToTry();
-  if (!models.length) throw new AiError("rate-limit", "Gemini free-tier quota used up for today");
-  for (let i = 0; i < models.length; i++) {
+  if (!models.length) throw new AiError("unavailable", "All Gemini models are busy or out of free quota; will retry on the next update");
+  let lastError: AiError | null = null;
+  for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        return await call(models[i], article);
+        return await call(model, article);
       } catch (err) {
         if (!(err instanceof AiError)) throw err;
-        // "High demand" / 5xx overloads are usually brief: retry once, then try the lighter model.
-        const overloaded = err.kind === "unavailable" && /\b50[0234]\b|high demand|overloaded/i.test(err.message);
-        if (overloaded && attempt === 0) {
-          await new Promise((r) => setTimeout(r, config.ai.geminiRetryDelayMs));
-          continue;
+        lastError = err;
+        // Busy ("high demand"), 5xx and timeouts are usually brief: retry once, then rest
+        // this model for a while and try the next one.
+        if (err.kind === "unavailable") {
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, config.ai.geminiRetryDelayMs));
+            continue;
+          }
+          busyUntil.set(model, Date.now() + BUSY_REST_MS);
+          break;
         }
-        const quotaOrMissing = err.kind === "rate-limit" || (err.kind === "config" && err.message.includes("is not available"));
-        if ((overloaded || quotaOrMissing) && i < models.length - 1) {
-          if (quotaOrMissing) quotaExhausted.add(models[i]); // skip it for the rest of the day
-          break; // next model
+        // Daily free quota used up, or the model no longer exists: skip it for today.
+        if (err.kind === "rate-limit" || (err.kind === "config" && err.message.includes("is not available"))) {
+          quotaExhausted.add(model);
+          break;
         }
         throw err;
       }
     }
   }
-  throw new AiError("rate-limit", "Gemini free-tier quota used up for today");
+  throw lastError ?? new AiError("rate-limit", "Gemini free-tier quota used up for today");
 }
 
 /** For tests. */
@@ -130,4 +155,6 @@ export function resetGeminiState() {
   lastCallAt = 0;
   quotaExhausted = new Set();
   quotaDay = "";
+  busyUntil = new Map();
+  noThinkingConfig.clear();
 }
