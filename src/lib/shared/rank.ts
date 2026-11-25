@@ -3,7 +3,7 @@
 import { normalizePrefs } from "./prefs";
 import { matchesSearch, searchTerms } from "./search";
 import { finalScore, isBreaking, relevanceFactor, tier, toRelevancePrefs, type RelevancePrefs } from "./scoring";
-import { COMPANIES, topicsOf, type Section } from "./taxonomy";
+import { COMPANIES, FILTER_IDS, groupOfTopic, PRIORITY_IDS, subjectTopics, topicsOf, TRENDING_COMPANY_IDS, type Section } from "./taxonomy";
 import type { CategoryPulse, CompanyPulse, DashboardResponse, Prefs, SnapshotStory, StoriesResponse, Story } from "./types";
 
 const HOUR = 3_600_000;
@@ -160,9 +160,16 @@ export function queryStories(stories: SnapshotStory[], q: StaticQuery, rawCtx: R
   return { stories: page, total: all.length, nextCursor: offset + limit < all.length ? offset + limit : null, generatedAt: ctx.generatedAt };
 }
 
-export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext): DashboardResponse {
+export interface DashboardOptions {
+  /** Filter every section to one priority category (or topic); null/"all" = everything. */
+  category?: string | null;
+}
+
+export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, opts: DashboardOptions = {}): DashboardResponse {
   const ctx = withNormalizedPrefs(rawCtx);
   const now = ctx.now;
+  const category = opts.category && opts.category !== "all" && FILTER_IDS.includes(opts.category) ? opts.category : null;
+  const scope: StaticQuery = category ? { category } : {};
   const shown = new Set<number>();
   const pick = (list: Ranked[], n: number, minScore = 0) => {
     const out: Ranked[] = [];
@@ -175,40 +182,133 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext): D
     return out.map(strip);
   };
 
-  let recent = rank(stories, { from: now - 24 * HOUR }, ctx);
-  if (recent.length < 12) recent = rank(stories, { from: now - 72 * HOUR }, ctx);
+  // The last 24 hours, widened on quiet days (and for narrow category filters).
+  const minimum = category ? 6 : 12;
+  let windowHours = 24;
+  let recent = rank(stories, { ...scope, from: now - windowHours * HOUR }, ctx);
+  for (const wider of [72, 168]) {
+    if (recent.length >= minimum) break;
+    windowHours = wider;
+    recent = rank(stories, { ...scope, from: now - windowHours * HOUR }, ctx);
+  }
   sortRanked(recent, "importance");
 
-  const top = pick(recent, 6);
+  // Featured: the most important stories, preferring those with the publisher's own image.
+  const leaders = recent.slice(0, 10);
+  const featured = [...leaders.filter((s) => s.imageUrl), ...leaders.filter((s) => !s.imageUrl)].slice(0, 5);
+  const top = pick(featured, 5);
+
+  // Daily Briefing: the leading story of each priority category in the last 24 hours (48 on quiet days).
+  const order = ctx.prefs.categoryOrder.filter((id) => ctx.prefs.interests.includes(id));
+  let briefWindow = 24;
+  let day = rank(stories, { ...scope, from: now - briefWindow * HOUR }, ctx);
+  if (day.length < 5) {
+    briefWindow = 48;
+    day = rank(stories, { ...scope, from: now - briefWindow * HOUR }, ctx);
+  }
+  sortRanked(day, "importance");
+  const briefingPicks: Ranked[] = [];
+  const briefed = new Set<number>();
+  for (const id of category ? [] : order) {
+    const topics = topicsOf(id);
+    const lead = day.find((s) => !briefed.has(s.id) && s.categories.some((t) => topics.includes(t)));
+    if (lead) {
+      briefingPicks.push(lead);
+      briefed.add(lead.id);
+    }
+    if (briefingPicks.length >= 5) break;
+  }
+  for (const s of day) {
+    if (briefingPicks.length >= 5) break;
+    if (!briefed.has(s.id)) {
+      briefingPicks.push(s);
+      briefed.add(s.id);
+    }
+  }
+  briefingPicks.sort((a, b) => b.score - a.score);
+  const catCounts = new Map<string, number>();
+  const coCounts = new Map<string, number>();
+  for (const s of day) {
+    for (const g of new Set(subjectTopics(s.categories).map(groupOfTopic))) if (PRIORITY_IDS.includes(g)) catCounts.set(g, (catCounts.get(g) ?? 0) + 1);
+    for (const c of s.companies) coCounts.set(c, (coCounts.get(c) ?? 0) + 1);
+  }
+  // Highest count; ties go to the reader's higher-priority category (or the first seen).
+  const rankOf = (id: string) => {
+    const i = order.indexOf(id);
+    return i === -1 ? 99 : i;
+  };
+  const best = (m: Map<string, number>, byPriority = false) => {
+    let out: { id: string; count: number } | null = null;
+    for (const [id, count] of m) {
+      if (!out || count > out.count || (byPriority && count === out.count && rankOf(id) < rankOf(out.id))) out = { id, count };
+    }
+    return out;
+  };
+
+  // Latest: newest first, with the reader's two highest-priority categories nudged forward.
+  // A story whose source gave no publication time is not treated as brand new, and no
+  // publisher fills more than two of the six cards.
+  const boosted = new Set(order.slice(0, 2).flatMap(topicsOf));
+  const latestPool = recent.filter((s) => !shown.has(s.id));
+  const nudge = (s: Ranked) => (s.firstPublishedAt ?? s.sortTime - 24 * HOUR) + (s.categories.some((t) => boosted.has(t)) ? 6 * HOUR : 0);
+  latestPool.sort((a, b) => nudge(b) - nudge(a) || b.score - a.score);
+  const perSource = new Map<string, number>();
+  const latest = pick(
+    latestPool.filter((s) => {
+      const n = perSource.get(s.source.id) ?? 0;
+      if (n >= 2) return false;
+      perSource.set(s.source.id, n + 1);
+      return true;
+    }),
+    6,
+  );
+
   const tech = pick(recent.filter((c) => c.sections.includes("tech")), 6);
   const gaming = pick(recent.filter((c) => c.sections.includes("gaming")), 6);
 
   const announcementTypes = new Set(["launch", "earnings", "acquisition", "partnership", "leadership", "pricing", "layoffs", "delay"]);
-  const recent48 = rank(stories, { from: now - 48 * HOUR }, ctx);
+  const recent48 = rank(stories, { ...scope, from: now - 48 * HOUR }, ctx);
   sortRanked(recent48, "importance");
   const announcements = pick(recent48.filter((c) => announcementTypes.has(c.eventType) && !c.rumor && c.companies.length > 0), 6, 45);
 
-  const older = rank(stories, { from: now - 96 * HOUR, to: now - 10 * HOUR }, ctx);
+  const older = rank(stories, { ...scope, from: now - 96 * HOUR, to: now - 10 * HOUR }, ctx);
   sortRanked(older, "importance");
   const missed = pick(older.filter((c) => !c.read), 6, 50);
 
+  const pulse = (ids: string[]): CompanyPulse[] =>
+    ids
+      .map((companyId) => {
+        const list = recent48.filter((c) => c.companies.includes(companyId));
+        return { companyId, count: list.length, top: list[0] ? strip(list[0]) : null };
+      })
+      .sort((a, b) => b.count - a.count);
   const followed = ctx.prefs.followedCompanies.length ? ctx.prefs.followedCompanies : COMPANIES.filter((c) => c.core).map((c) => c.id);
-  const companies: CompanyPulse[] = followed
-    .map((companyId) => {
-      const list = recent48.filter((c) => c.companies.includes(companyId));
-      return { companyId, count: list.length, top: list[0] ? strip(list[0]) : null };
-    })
-    .sort((a, b) => b.count - a.count);
+  const companies = pulse(followed);
+  const trending = pulse(TRENDING_COMPANY_IDS);
 
-  const byCategory: CategoryPulse[] = ctx.prefs.categoryOrder
-    .filter((id) => ctx.prefs.interests.includes(id))
-    .map((categoryId) => {
-      const topics = topicsOf(categoryId);
-      const list = recent48.filter((c) => c.categories.some((t) => topics.includes(t)));
-      return { categoryId, count: list.length, stories: list.slice(0, 3).map(strip) };
-    });
+  const all48 = category ? rank(stories, { from: now - 48 * HOUR }, ctx) : recent48;
+  if (category) sortRanked(all48, "importance");
+  const byCategory: CategoryPulse[] = order.map((categoryId) => {
+    const topics = topicsOf(categoryId);
+    const list = all48.filter((c) => c.categories.some((t) => topics.includes(t)));
+    return { categoryId, count: list.length, stories: list.slice(0, 3).map(strip) };
+  });
 
-  return { byCategory, top, tech, gaming, announcements, missed, companies, generatedAt: ctx.generatedAt };
+  return {
+    category,
+    byCategory,
+    top,
+    briefing: briefingPicks.map(strip),
+    briefingFacts: { windowHours: briefWindow, stories: day.length, topCategory: category ? null : best(catCounts, true), topCompany: best(coCounts) },
+    latest,
+    trending,
+    tech,
+    gaming,
+    announcements,
+    missed,
+    companies,
+    generatedAt: ctx.generatedAt,
+  };
 }
 
 export function countCompanies(stories: SnapshotStory[], from: number, rawCtx: RankContext): Record<string, number> {

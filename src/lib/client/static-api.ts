@@ -5,7 +5,8 @@
 // Reader state — saved stories, read history and settings — stays in this browser.
 import { buildDashboard, countCompanies, queryStories, type RankContext } from "@/lib/shared/rank";
 import type { Section } from "@/lib/shared/taxonomy";
-import type { Prefs, Snapshot, SnapshotStory, SourceHealth, StatusResponse, Story } from "@/lib/shared/types";
+import { nextReportAt } from "@/lib/shared/schedule";
+import type { Prefs, RadarResponse, ReportResponse, Snapshot, SnapshotStory, SourceHealth, StatusResponse, Story, WeeklyReport } from "@/lib/shared/types";
 import { normalizePrefs } from "@/lib/shared/prefs";
 import { BASE_PATH } from "./mode";
 
@@ -69,6 +70,27 @@ async function getSnapshot(): Promise<Snapshot> {
   return snapshotPromise;
 }
 
+/** Report file of the web edition: the latest reports in full, newest first. */
+export interface ReportFile {
+  generatedAt: string;
+  reports: WeeklyReport[];
+}
+
+const dataFiles = new Map<string, { version: string; promise: Promise<unknown> }>();
+
+/** Radar and report files follow the snapshot's version so they refresh together. */
+async function getDataFile<T>(name: string): Promise<T> {
+  const version = latestGeneratedAt ?? (await loadStatusFile()).generatedAt;
+  const cached = dataFiles.get(name);
+  if (cached && cached.version === version) return cached.promise as Promise<T>;
+  const promise = getJson<T>(name, version).catch((err) => {
+    dataFiles.delete(name);
+    throw err;
+  });
+  dataFiles.set(name, { version, promise });
+  return promise;
+}
+
 export function getPrefs(defaults: Prefs): Prefs {
   // Settings saved before the priority categories existed are migrated, not reset.
   return normalizePrefs({ ...defaults, categoryOrder: [], ...readStorage<Partial<Prefs>>(KEYS.prefs, {}) } as Prefs);
@@ -110,7 +132,20 @@ export async function staticFetch<T>(key: string): Promise<T> {
     }
     case "/api/dashboard": {
       const { snap, ctx } = await context();
-      return buildDashboard(snap.stories, ctx) as T;
+      return buildDashboard(snap.stories, ctx, { category: p.get("category") }) as T;
+    }
+    case "/api/radar":
+      return (await getDataFile<RadarResponse>("radar.json")) as T;
+    case "/api/report": {
+      const file = await getDataFile<ReportFile>("report.json");
+      const id = num(p.get("id"));
+      const latest = (id ? file.reports.find((r) => r.id === id) : file.reports[0]) ?? null;
+      return {
+        latest,
+        archive: file.reports.map((r) => ({ id: r.id, periodStart: r.periodStart, periodEnd: r.periodEnd })),
+        nextAt: new Date(nextReportAt(Date.now())).toISOString(),
+        generatedAt: file.generatedAt,
+      } satisfies ReportResponse as T;
     }
     case "/api/companies": {
       const { snap, ctx } = await context();

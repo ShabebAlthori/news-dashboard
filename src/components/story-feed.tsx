@@ -1,15 +1,16 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Star } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import { RANGE_KEYS, rangeToBounds, type RangeKey } from "@/lib/shared/format";
-import { categoriesFor, categoryLabel, COMPANIES, MORE_TOPIC_IDS, PRIORITY_IDS, type Section } from "@/lib/shared/taxonomy";
+import { categoriesFor, COMPANIES, MORE_TOPIC_IDS, PRIORITY_IDS, shortCategoryLabel, type Section } from "@/lib/shared/taxonomy";
 import type { Prefs, StoriesResponse } from "@/lib/shared/types";
 import { useNow, useUi } from "./providers";
 import { StoryCard } from "./story-card";
+import { CATEGORY_ICONS } from "./story-visuals";
 import { EmptyState, ErrorState, ListSkeleton, NewStoriesBanner } from "./states";
 import { useStatus } from "./use-data";
 
@@ -66,7 +67,18 @@ export function useUpdateParams() {
 }
 
 function selectClass() {
-  return "h-9 rounded-md border border-line bg-surface px-2.5 text-sm text-fg hover:border-line-strong";
+  return "h-9 rounded-full border border-line bg-surface px-3 text-sm text-fg transition-colors hover:border-line-strong";
+}
+
+function ChipIcon({ id, on }: { id: string; on: boolean }) {
+  const Icon = CATEGORY_ICONS[id];
+  return Icon ? <Icon className={`size-4 ${on ? "" : "text-accent"}`} aria-hidden /> : null;
+}
+
+function chipClass(on: boolean) {
+  return `inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-colors ${
+    on ? "brand-gradient border-transparent text-white" : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg"
+  }`;
 }
 
 export function StoryFeed(cfg: FeedConfig) {
@@ -115,7 +127,7 @@ export function StoryFeed(cfg: FeedConfig) {
 
   const order = prefs?.categoryOrder?.length ? prefs.categoryOrder : PRIORITY_IDS;
   const categories: { id: string; en: string; ar: string }[] = cfg.priorityChips
-    ? [...order, ...MORE_TOPIC_IDS].map((id) => ({ id, ...(categoryLabel(id) ?? { en: id, ar: id }) }))
+    ? [...order, ...MORE_TOPIC_IDS].map((id) => ({ id, ...(shortCategoryLabel(id) ?? { en: id, ar: id }) }))
     : (cfg.categorySections ?? []).flatMap((s) => categoriesFor(s));
   const followed = new Set(prefs?.followedCompanies ?? []);
   const companyOptions = [...COMPANIES].sort((a, b) => Number(followed.has(b.id)) - Number(followed.has(a.id)) || a.en.localeCompare(b.en));
@@ -126,14 +138,15 @@ export function StoryFeed(cfg: FeedConfig) {
       {/* Filters */}
       <div className="mb-5 space-y-3">
         {categories.length > 0 && (
-          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="toolbar" aria-label={t("filters.category")}>
+          <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="toolbar" aria-label={t("filters.category")}>
             <div className="flex w-max gap-1.5 sm:w-auto sm:flex-wrap">
               <button
                 type="button"
                 onClick={() => update({ cat: null })}
                 aria-pressed={!p.category}
-                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-sm ${!p.category ? "border-fg bg-fg text-bg" : "border-line text-muted hover:text-fg"}`}
+                className={chipClass(!p.category)}
               >
+                <Star className="size-4" aria-hidden />
                 {t("filters.allCategories")}
               </button>
               {categories.map((c) => (
@@ -142,8 +155,9 @@ export function StoryFeed(cfg: FeedConfig) {
                   type="button"
                   onClick={() => update({ cat: p.category === c.id ? null : c.id })}
                   aria-pressed={p.category === c.id}
-                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-sm ${p.category === c.id ? "border-fg bg-fg text-bg" : "border-line text-muted hover:text-fg"}`}
+                  className={chipClass(p.category === c.id)}
                 >
+                  <ChipIcon id={c.id} on={p.category === c.id} />
                   {c[lang]}
                 </button>
               ))}
@@ -194,7 +208,7 @@ export function StoryFeed(cfg: FeedConfig) {
               <option value="newest">{t("sort.newest")}</option>
             </select>
           </label>
-          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-line px-2.5 text-sm text-fg" title={t("filters.groupHint")}>
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm text-fg" title={t("filters.groupHint")}>
             <input type="checkbox" checked={p.group} onChange={(e) => update({ group: e.target.checked ? null : "0" })} className="size-4 accent-[var(--accent)]" />
             {t("filters.group")}
           </label>
@@ -202,7 +216,7 @@ export function StoryFeed(cfg: FeedConfig) {
             <button
               type="button"
               onClick={() => update({ cat: null, co: null, range: null, from: null, to: null, sort: null, group: null })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted hover:text-fg"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted hover:text-fg"
             >
               <RotateCcw className="size-3.5" aria-hidden />
               {t("filters.reset")}
@@ -235,7 +249,7 @@ export function StoryFeed(cfg: FeedConfig) {
                 type="button"
                 onClick={() => setSize(size + 1)}
                 disabled={isValidating}
-                className="rounded-md border border-line bg-surface px-4 py-2 text-sm font-medium text-fg hover:bg-surface-2 disabled:opacity-60"
+                className="rounded-full border border-line bg-surface px-5 py-2 text-sm font-medium text-fg hover:bg-surface-2 disabled:opacity-60"
               >
                 {isValidating ? t("common.loading") : t("list.loadMore")}
               </button>

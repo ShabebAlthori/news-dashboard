@@ -59,6 +59,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-opus-5-5' }}
           AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '200' }}
+          # Data Radar: notable new data repositories via the GitHub search API (read-only use).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Save news database
         if: success() || failure()

@@ -1,11 +1,15 @@
 // Refreshes all feeds, then writes the web edition's data files:
 //   out/data/snapshot.json  — every story of the last SNAPSHOT_DAYS days (default 7)
 //   out/data/status.json    — last update time, source health and AI status (polled by the page)
+//   out/data/radar.json     — Data Radar items (releases, research, updates) and radar source health
+//   out/data/report.json    — the latest Weekly Tech Reports
 // Usage: npm run export:static [-- <output dir>] [--no-refresh]
 import fs from "node:fs";
 import path from "node:path";
 import { runRefresh } from "../src/lib/server/pipeline";
 import { exportSnapshotStories } from "../src/lib/server/queries";
+import { getRadar } from "../src/lib/server/radar";
+import { listReports, maybeGenerateWeeklyReport } from "../src/lib/server/report";
 import { defaultPrefs } from "../src/lib/server/settings";
 import { getSourcesHealth, getStatus } from "../src/lib/server/status";
 import type { Snapshot } from "../src/lib/shared/types";
@@ -20,6 +24,8 @@ async function main() {
     console.log(JSON.stringify(result));
   }
 
+  // Normally done by the refresh; also covers --no-refresh exports of an existing database.
+  maybeGenerateWeeklyReport();
   const status = { ...getStatus(), running: false, nextRunAt: null };
   const sources = getSourcesHealth();
   const stories = exportSnapshotStories(days);
@@ -29,6 +35,9 @@ async function main() {
 
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "snapshot.json"), JSON.stringify(snapshot));
+  fs.writeFileSync(path.join(outDir, "radar.json"), JSON.stringify({ ...getRadar(), generatedAt }));
+  fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ generatedAt, reports: listReports(6) }));
+  // status.json last: the page polls it and then loads the other files at this version.
   fs.writeFileSync(path.join(outDir, "status.json"), JSON.stringify({ generatedAt, status, sources }));
   const kb = Math.round(fs.statSync(path.join(outDir, "snapshot.json")).size / 1024);
   console.log(`Wrote ${stories.length} stories (${kb} KB) to ${outDir}`);

@@ -159,6 +159,46 @@ const MIGRATIONS: string[] = [
     VALUES (new.id, new.title, new.excerpt, new.title_ar, new.summary_en, new.summary_ar);
   END;
   `,
+  // v2 — Data Radar (platform releases, research, updates) and the Weekly Tech Report.
+  // Additive only: existing articles, clusters, saved stories and settings are untouched.
+  `
+  CREATE TABLE IF NOT EXISTS radar_sources (
+    id TEXT PRIMARY KEY,
+    etag TEXT,
+    last_modified TEXT,
+    last_attempt_at INTEGER,
+    last_success_at INTEGER,
+    last_status TEXT,
+    last_error TEXT,
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS radar_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id TEXT NOT NULL,
+    guid TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT,
+    url TEXT NOT NULL,
+    type TEXT NOT NULL,
+    version TEXT,
+    published_at INTEGER,
+    fetched_at INTEGER NOT NULL,
+    extra TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(source_id, guid)
+  );
+  CREATE INDEX IF NOT EXISTS idx_radar_published ON radar_items(published_at);
+
+  CREATE TABLE IF NOT EXISTS weekly_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    period_start INTEGER NOT NULL,
+    period_end INTEGER NOT NULL,
+    generated_at INTEGER NOT NULL,
+    data TEXT NOT NULL
+  );
+  `,
 ];
 
 function migrate(db: DB) {

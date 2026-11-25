@@ -37,7 +37,8 @@ export interface Story {
   url: string;
   /** Language the lead article was published in ("ar" for Arabic-language sources). */
   lang: Lang;
-  source: { id: string; name: string; official: boolean };
+  /** `homepage` lets the UI show the publisher's own icon; absent on stories saved by older versions. */
+  source: { id: string; name: string; official: boolean; homepage?: string };
   publishedAt: string | null; // as reported by the source; null if the source gave none
   fetchedAt: string; // when this dashboard first retrieved the lead article
   sections: Section[];
@@ -75,10 +76,28 @@ export interface CategoryPulse {
   stories: Story[]; // the most important few
 }
 
+/** Facts behind the Daily Briefing's key takeaway — counted, never written by AI. */
+export interface BriefingFacts {
+  windowHours: number;
+  stories: number;
+  topCategory: { id: string; count: number } | null;
+  topCompany: { id: string; count: number } | null;
+}
+
 export interface DashboardResponse {
+  /** Priority category the dashboard is filtered to (null = everything). */
+  category: string | null;
   /** The reader's priority categories, in their order. */
   byCategory: CategoryPulse[];
+  /** Featured stories for the hero carousel (most important, with imagery preferred). */
   top: Story[];
+  /** Daily Briefing: one leading headline per priority category. */
+  briefing: Story[];
+  briefingFacts: BriefingFacts;
+  /** Newest stories, nudged towards the reader's two highest-priority categories. */
+  latest: Story[];
+  /** News activity of the tracked companies (story counts, not market data). */
+  trending: CompanyPulse[];
   tech: Story[];
   gaming: Story[];
   announcements: Story[];
@@ -157,6 +176,91 @@ export interface SnapshotStory extends Story {
   significance: number;
   baseScore: number; // importance without the reader-relevance component
   policy: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Data Radar: releases, research and updates from data platforms and tools.
+
+export type RadarType = "release" | "research" | "update" | "repository";
+
+export interface RadarItem {
+  id: number;
+  sourceId: string;
+  /** Project or platform name, e.g. "PostgreSQL", "Apache Spark". */
+  platform: string;
+  title: string;
+  summary: string | null;
+  url: string;
+  type: RadarType;
+  version: string | null;
+  /** As reported by the source; null when it gave none. */
+  publishedAt: string | null;
+  fetchedAt: string;
+  /** GitHub stars when the item is a repository (as reported by the GitHub API at retrieval). */
+  stars?: number | null;
+  language?: string | null;
+}
+
+export interface RadarSourceStatus {
+  id: string;
+  platform: string;
+  homepage: string;
+  lastSuccessAt: string | null;
+  lastAttemptAt: string | null;
+  lastStatus: string | null;
+  lastError: string | null;
+}
+
+export interface RadarResponse {
+  items: RadarItem[];
+  /** Last time any radar source was fetched successfully. */
+  lastSuccessAt: string | null;
+  sources: RadarSourceStatus[];
+  generatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Tech Report: generated from the week's stories, every Sunday.
+
+export interface ReportStory {
+  id: number;
+  title: { original: string; en: string; ar: string | null };
+  summary: { en: string | null; ar: string | null };
+  lang: Lang;
+  url: string;
+  source: string;
+  publishedAt: string | null;
+  importance: number;
+  sourceCount: number;
+  imageUrl: string | null;
+}
+
+export interface ReportSection {
+  /** A priority category id, or "companies". */
+  id: string;
+  count: number;
+  stories: ReportStory[];
+}
+
+export interface WeeklyReport {
+  id: number;
+  periodStart: string;
+  periodEnd: string;
+  generatedAt: string;
+  totals: { stories: number; sources: number; radar: number };
+  highlights: ReportStory[];
+  sections: ReportSection[];
+  companies: { id: string; count: number; top: ReportStory | null }[];
+  radar: RadarItem[];
+}
+
+export interface ReportResponse {
+  latest: WeeklyReport | null;
+  /** Earlier reports (period and id only). */
+  archive: { id: number; periodStart: string; periodEnd: string }[];
+  /** When the next report is due. */
+  nextAt: string;
+  generatedAt: string;
 }
 
 export interface Snapshot {

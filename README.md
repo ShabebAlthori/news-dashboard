@@ -1,6 +1,6 @@
-# Briefing · الموجز
+# TechPulse · Stay Ahead
 
-A personal, bilingual (Arabic / English) technology and gaming news dashboard. It collects news from reputable publishers and official company newsrooms, removes duplicates and noise, groups coverage of the same event into one story, ranks stories by importance, and summarizes them in English and Arabic.
+A personal, bilingual (Arabic / English) technology, data and gaming news dashboard. It collects news from reputable publishers and official company newsrooms, removes duplicates and noise, groups coverage of the same event into one story, ranks stories by importance, and summarizes them in English and Arabic. A **Data Radar** follows releases, research and updates from data platforms, and a **Weekly Tech Report** is published every Sunday.
 
 It is built to answer, in one screen:
 
@@ -10,14 +10,13 @@ It is built to answer, in one screen:
 - Which announcements matter?
 - Which important stories did I miss?
 
-| English (light) | Arabic (dark) |
+| English (dark) | Arabic (dark, RTL) |
 | --- | --- |
-| ![Dashboard in English](docs/screenshots/dash-en-light.png) | ![Dashboard in Arabic](docs/screenshots/dash-ar-dark.png) |
-| ![Technology page](docs/screenshots/tech-en-dark.png) | ![NVIDIA company page in Arabic](docs/screenshots/company-nvidia-ar.png) |
+| ![Dashboard in English](docs/screenshots/dash-en-dark.jpg) | ![Dashboard in Arabic](docs/screenshots/dash-ar-dark.jpg) |
+| ![Data Radar](docs/screenshots/radar-en-dark.jpg) | ![Weekly Tech Report in Arabic](docs/screenshots/report-ar-dark.jpg) |
+| ![Dashboard, light theme](docs/screenshots/dash-en-light.jpg) | <img src="docs/screenshots/mobile-dash-ar.jpg" alt="Mobile, Arabic" width="300"> |
 
-<img src="docs/screenshots/mobile-dash-ar.png" alt="Mobile, Arabic" width="300">
-
-> The screenshots show real articles fetched on 25 Nov 2026 **without** an AI key configured. In that mode cards show the publisher's own excerpt, and Arabic readers see a note that the Arabic summary is not available yet. See [AI summaries](#ai-summaries--translation).
+> The screenshots show real articles, releases and papers fetched on 25 Nov 2026 **without** an AI key configured. In that mode cards show the publisher's own excerpt and headlines stay in their original language. See [AI summaries](#ai-summaries--translation). Stories whose publisher supplies no image get abstract category artwork, never a stand-in photo.
 
 ---
 
@@ -28,7 +27,7 @@ It is built to answer, in one screen:
 The web edition is a free, always-on copy of the dashboard hosted on GitHub Pages. Open it on a phone or a computer; there is nothing to install or run.
 
 - **Automatic updates.** A GitHub Actions workflow ([`.github/workflows/web-edition.yml`](.github/workflows/web-edition.yml)) runs about every 15 minutes, even when your computer is off. Each run fetches the feeds, deduplicates, clusters, scores and (optionally) summarizes the news, then publishes the result. GitHub sometimes starts scheduled runs a few minutes late.
-- **Same features.** All pages, filters, search, Arabic/English, dark mode and importance ranking work as in the self-hosted version. Ranking and search run in your browser over the latest published data (the last 7 days).
+- **Same features.** All pages, filters, search, Arabic/English, themes, importance ranking, the Data Radar and the Weekly Tech Report work as in the self-hosted version. Ranking and search run in your browser over the latest published data (the last 7 days). The radar's **Live** label reflects the last successful scheduled run, so it switches off by itself if GitHub delays the schedule.
 - **Your data stays in your browser.** Saved stories, read history (used by "You might have missed") and settings are kept in the browser's storage on each device, not on GitHub.
 - **AI summaries and Arabic translation (free option).**
   1. Create a free Gemini API key at <https://aistudio.google.com/apikey> (sign in with a Google account, then **Create API key**).
@@ -49,7 +48,7 @@ BASE_PATH=/news-dashboard npm run build:static
 npm run export:static
 ```
 
-The first command writes the site to `out/`; the second refreshes feeds and writes `out/data/`.
+The first command writes the site to `out/`; the second refreshes feeds and writes `out/data/` (`snapshot.json`, `status.json`, `radar.json`, `report.json`).
 
 ---
 
@@ -133,17 +132,38 @@ npm start
   - **Saudi technology and startups:** Wamda, TechCrunch's Saudi Arabia feed, and two Saudi-based Arabic sites, البوابة التقنية (AIT News) and عالم التقنية (Tech-WD).
 - **Arabic-language sources** are classified with Arabic keyword rules (categories, companies, events, and the same excluded topics) and shown in Arabic. Until an AI provider translates them, English readers see the original Arabic with a note.
 - Categories: AI, software, cybersecurity, PC hardware & GPUs, CPUs & semiconductors, phones & consumer electronics, operating systems, programming; PC gaming, PlayStation/Xbox/Nintendo, releases, gaming industry, gaming hardware, Steam & platforms, game engines, esports business; earnings, acquisitions, partnerships, layoffs, leadership, strategy, product announcements.
-- 24 tracked companies (the 18 you listed plus TSMC, Arm, xAI, ByteDance, Epic Games, Ubisoft), with aliases such as Xbox → Microsoft, GeForce → NVIDIA, Rockstar/GTA → Take-Two.
+- 27 tracked companies (the 18 you listed, Databricks, Snowflake and Palantir, plus TSMC, Arm, xAI, ByteDance, Epic Games and Ubisoft), with aliases such as Xbox → Microsoft, GeForce → NVIDIA, Rockstar/GTA → Take-Two.
 - **Strict exclusion** of politics and elections, political conflicts, sports (but not sports video games), esports match results, celebrity gossip, film/TV/music entertainment, shopping deals and coupons, how-to guides and walkthroughs, puzzle answers, podcasts/roundups, sponsored posts and clickbait. On the first real fetch, 174 of 571 items were filtered out this way (65 deals, 54 off-topic, 24 guides, 16 politics, 11 entertainment and a few others).
 
+**Dashboard (TechPulse design)**
+- **Category chips:** All · Data & Analytics · AI · Business · Programming · Cybersecurity · Gaming · Saudi Tech · Robotics. A chip filters the whole dashboard (`/?cat=…`).
+- **Featured Top Story** carousel: the five most important stories, using the publisher's own image (abstract category artwork when there is none), with source, publication time, Read more and bookmark.
+- **Daily Briefing:** the leading story of each of your priority categories in the last 24 hours, plus a *key takeaway* that is counted, not written: number of stories, most active category and most covered company.
+- **Latest News** grid: newest first, with your two highest-priority categories (by default Data & Analytics and AI) brought forward. Stories without a publication time are not treated as brand new, and no publisher fills more than two cards.
+- **Trending Companies:** NVIDIA, Microsoft, Google, Apple, Amazon, AMD, Intel, OpenAI, Anthropic, Databricks, Snowflake and Palantir, ranked by **news activity** (stories in 48 hours) with their latest headline. **No stock prices or percentage changes are shown**; the dashboard has no verified market-data source.
+- **Data Radar** panel and **Weekly Tech Report** panel (below), then Your categories, Key announcements, You might have missed, Technology today and Biggest in gaming.
+
+**Data Radar** (`/radar`)
+- Releases, research, product updates and notable new repositories from data platforms: PostgreSQL, Apache Spark, Apache Kafka, Apache Airflow, DuckDB, dbt, Polars, Apache Iceberg, Microsoft Fabric, Power BI, arXiv (Databases) and GitHub.
+- Each item shows the project, title, the source's own publication date, a type badge (Release, Research, Update, Repository) and links to the original.
+- Pre-releases (rc, beta, dev builds), arXiv revisions and community events (calls for papers, meetups) are left out.
+- The green **Live** label appears only when the radar refreshed successfully in the last 40 minutes; otherwise the panel says when it last refreshed.
+
+**Weekly Tech Report** (`/report`)
+- Published every Sunday at 02:00 UTC (05:00 Riyadh), and straight away when none exists yet. It covers the 7 days before publication.
+- Assembled from the stories collected during the week: highlights (at most two per category), one section per priority category, major-company activity, and the week's data-platform releases. Counts and rankings are computed; every entry keeps its publisher's headline, summary, link and publication time. No AI prose is added.
+- Earlier reports stay available (the last 12 on a server, the last 6 in the web edition).
+
 **Reading experience**
-- Dashboard: Top stories · Technology today · Biggest in gaming · Company pulse · Key announcements · You might have missed (important stories you haven't opened).
-- Pages: Latest, Technology, Gaming, Companies (grid + per-company feed), Search, Saved, Settings.
+- Pages: Home, Latest News, Data Radar, AI & Tech, Gaming, Companies (logos, grid and per-company feed), Saved Articles, Settings, plus Search and the Weekly Report.
+- Top bar: bilingual search (Arabic or English), an EN | عربي switch, notifications (breaking and major stories of the last 24 hours, with an unread count) and a profile menu. There are no accounts: the menu explains where your settings and saved articles are kept.
 - Each card shows: headline (with the original headline whenever a translated or cleaned-up one is shown), a 2–4 sentence summary, category, source (official sources marked), **publication time** (absolute and relative), number of independent sources, an importance indicator, links to other coverage, a "Why it ranks here" breakdown, and the **retrieval time**. Each card can be flipped to its other-language version.
 - Filters: category, company, date (today, 24 h, 3/7/30 days, any time, custom range), sort by importance or newest, and "Group same story" on/off. Filters live in the URL, so switching language never loses the current page or filters.
 - Search in English or Arabic (full-text, prefix matching; Arabic company names and key terms also match English text).
 - Arabic is first-class: server-rendered `dir="rtl"` with no flash, IBM Plex Sans Arabic with generous line height, logical CSS properties throughout, Arabic plural rules, Western digits, isolated English fragments inside Arabic text.
-- Dark, light and system themes; responsive layout with a sidebar on desktop and a header plus bottom tabs on mobile; no decorative animations.
+- **Design:** a dark premium theme by default (background `#090B18`, violet `#713BFF` and blue `#4388FF` accents, success green `#20D98A`) with a matching light theme and an optional "system" setting. Glass is used only for floating chrome (top bar, bottom tabs). Motion is restrained: card lift on hover, shimmering loading skeletons, and nothing when the system asks for reduced motion.
+- **Layout:** full sidebar on desktop (collapsible), an icon rail on tablets, and a compact top bar, single column, bottom tabs and a menu drawer on phones. In Arabic the whole layout mirrors.
+- **Logos:** company and project marks come from [Simple Icons](https://simpleicons.org) (CC0). Brands that are not there (Microsoft, Amazon, OpenAI, Nintendo and others) get a plain monogram. Publisher icons are the sites' own favicons.
 
 **Reliability**
 - Automatic refresh every 10–15 minutes (in-process scheduler with a database lock; optional standalone worker or external cron).
@@ -257,6 +277,20 @@ To use the cheaper model, set `ANTHROPIC_MODEL=claude-haiku-5-5`. That choice is
 | Nintendo, EA, Take-Two, Valve corporate, Qualcomm, Tencent, Anthropic | No public news feed was found. These companies are still covered through the publishers above (and Steam News for Valve). |
 
 To add a source, append it to `src/lib/server/sources.ts`. Sources can be switched off in Settings.
+
+**Data Radar sources** (`src/lib/server/radar.ts`) are fetched with the same polite fetcher (robots.txt, conditional requests, backoff). Slow-moving sources are fetched less often (arXiv and Kafka every 6 hours, PyPI feeds every 1–2 hours).
+
+| Platform | Source |
+| --- | --- |
+| PostgreSQL | postgresql.org news feed |
+| Microsoft Fabric, Power BI | the official Microsoft blogs' feeds |
+| Apache Kafka | the blog entries of kafka.apache.org's site feed |
+| Apache Airflow, DuckDB | the projects' own blog feeds |
+| Apache Spark, dbt Core, Polars, PyIceberg | PyPI's official per-project release feeds |
+| Research | arXiv's official RSS for cs.DB (new papers only) |
+| GitHub repositories | GitHub's REST search API — only when `GITHUB_TOKEN` is set (the web edition's workflow passes its built-in token). Notable new repositories tagged data-engineering or database, with at least 100 stars. |
+
+Not used for the radar: github.com release/tag Atom feeds (their `robots.txt` status for automated clients could not be verified, so the documented API is used instead) and spark.apache.org (no feed; Spark releases come from PyPI).
 
 ---
 
@@ -382,10 +416,13 @@ During development the app was also checked in a real browser (Playwright):
 
 ```
 src/
-  app/                    Pages (dashboard, latest, technology, gaming, companies, search, saved, settings) and API routes
-  components/             Client UI: app shell, story card, feed + filters, dashboard, settings
+  app/                    Pages (dashboard, latest, radar, report, technology, gaming, companies, search, saved,
+                          settings) and API routes (stories, dashboard, radar, report, settings, …)
+  components/             Client UI: app shell + top bar, dashboard (hero, briefing, news grid, trending
+                          companies), radar and report views, story card, feed + filters, settings
   lib/shared/             Client-safe code: taxonomy, i18n (en/ar), formatting, types, scoring, search,
-                          rank.ts (in-browser ranking for the web edition)
+                          rank.ts (ranking + dashboard builder, shared by server and web edition),
+                          schedule.ts (Live rule, report schedule), brand-marks.ts (Simple Icons, CC0)
   lib/client/             Web-edition data layer (static snapshot + browser storage) and shared actions
   lib/server/             Server-only code
     sources.ts            Feed registry (with reasons for exclusions)
@@ -396,6 +433,8 @@ src/
     ai/                   Claude + Ollama providers, prompt, fact guard
     pipeline.ts           Refresh pipeline; scheduler.ts runs it on a timer
     queries.ts            Story listing, dashboard, search
+    radar.ts              Data Radar sources, parsing and storage
+    report.ts             Weekly Tech Report (built every Sunday from stored stories)
   instrumentation.ts      Starts the scheduler with the server
   proxy.ts                Optional Basic auth
 scripts/                  refresh.ts (one-off), worker.ts (standalone scheduler),

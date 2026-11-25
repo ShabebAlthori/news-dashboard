@@ -286,6 +286,10 @@ const COMPANY_PATTERNS: CompanyPattern[] = [
   { id: "bytedance", patterns: [/\bByteDance\b/i, /\bTikTok\b/i, ar("بايت دانس|تيك توك")] },
   { id: "epic", patterns: [/\bEpic Games\b/i, /\bFortnite\b/i, /\bUnreal Engine\b/i, /\bTim Sweeney\b/i, ar("إيبك جيمز|فورتنايت")] },
   { id: "ubisoft", patterns: [/\bUbisoft\b/i, /\bAssassin'?s Creed\b/i, ar("يوبيسوفت")] },
+  { id: "databricks", patterns: [/\bDatabricks\b/i, /\bAli Ghodsi\b/i, ar("داتابريكس|داتا بريكس")] },
+  // "snowflake" is also an ordinary word: only the capitalised company name counts.
+  { id: "snowflake", patterns: [/\bSnowflake\b(?! (ID|IDs|schema|pattern)\b)/, /\bSnowpark\b/, /\bSridhar Ramaswamy\b/i, ar("سنوفليك|سنو فليك")] },
+  { id: "palantir", patterns: [/\bPalantir\b/i, /\bAlex Karp\b/i, ar("بالانتير|بلانتير")] },
 ];
 
 export function detectCompanies(title: string, text: string): { all: string[]; inTitle: string[] } {

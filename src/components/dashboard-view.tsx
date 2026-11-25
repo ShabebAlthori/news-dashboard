@@ -1,83 +1,392 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, ChevronLeft, ChevronRight, Clock, Lightbulb, Newspaper, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import useSWR from "swr";
-import { formatLongDate } from "@/lib/shared/format";
 import { markRead } from "@/lib/client/actions";
-import { formatRelative } from "@/lib/shared/format";
-import { categoryLabel, companyById } from "@/lib/shared/taxonomy";
-import type { DashboardResponse, Prefs, Story } from "@/lib/shared/types";
+import { formatLongDate, formatRelative } from "@/lib/shared/format";
+import { categoryLabel, companyById, shortCategoryLabel } from "@/lib/shared/taxonomy";
+import type { BriefingFacts, CompanyPulse, DashboardResponse, Story } from "@/lib/shared/types";
+import { CategoryChips } from "./category-chips";
+import { CompanyLogo, SourceLogo } from "./logos";
+import { NewsCard, StoryLine, StoryTime } from "./news-card";
 import { useNow, useUi } from "./providers";
-import { StoryCard } from "./story-card";
-import { storyHeadline } from "./story-text";
-import { EmptyState, ErrorState, ListSkeleton, NewStoriesBanner, SectionTitle } from "./states";
+import { RadarPanel } from "./radar-view";
+import { ReportPanel } from "./report-view";
+import { EmptyState, ErrorState, NewStoriesBanner } from "./states";
+import { useUpdateParams } from "./story-feed";
+import { storyHeadline, storySummary } from "./story-text";
+import { BookmarkButton, CategoryBadge, StoryImage, useStoryCategory } from "./story-visuals";
 import { useHasNewer, useStatus } from "./use-data";
 
-function SeeAll({ href, label }: { href: string; label?: string }) {
+function ViewAll({ href, label }: { href: string; label?: string }) {
   const { t } = useUi();
   return (
-    <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+    <Link href={href} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-medium text-accent hover:underline">
       {label ?? t("dash.seeAll")}
-      <ArrowRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
+      <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
     </Link>
   );
 }
 
-/** Compact headline row: headline, source, time and importance. */
-function StoryLine({ story }: { story: Story }) {
-  const { lang, t } = useUi();
-  const now = useNow();
-  const h = storyHeadline(story, lang);
+function PanelTitle({ icon, title, hint, action, id }: { icon: ReactNode; title: string; hint?: string; action?: ReactNode; id?: string }) {
   return (
-    <li className="py-2 first:pt-0 last:pb-0">
-      <a
-        href={story.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => markRead(story.leadArticleId, story.url)}
-        lang={h.lang}
-        dir={h.lang === "ar" ? "rtl" : "ltr"}
-        className="line-clamp-2 block text-[15px] font-medium leading-snug text-fg hover:text-accent"
-      >
-        {h.text}
-      </a>
-      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
-        <span dir="auto">{story.source.name}</span>
-        {story.publishedAt && <span>· {formatRelative(story.publishedAt, lang, now)}</span>}
-        {story.sourceCount > 1 && <span>· {t("card.sources", { n: story.sourceCount })}</span>}
-        <span className={story.tier === "major" ? "font-semibold text-accent-strong" : ""}>· {t(`importance.${story.tier}`)}</span>
-      </p>
-    </li>
+    <div className="mb-4">
+      <div className="flex items-center gap-3">
+        <span className="shrink-0">{icon}</span>
+        <h2 id={id} className="min-w-0 text-lg font-bold leading-tight text-fg">
+          {title}
+        </h2>
+        <span className="ms-auto shrink-0">{action}</span>
+      </div>
+      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
+    </div>
   );
 }
 
-function StoryColumn({ stories, showImages }: { stories: Story[]; showImages: boolean }) {
-  const { t } = useUi();
-  if (!stories.length) return <EmptyState title={t("list.empty")} />;
+function IconBubble({ children }: { children: ReactNode }) {
+  return <span className="inline-flex size-9 items-center justify-center rounded-full bg-accent-soft text-accent">{children}</span>;
+}
+
+// ---------------------------------------------------------------------------
+// A. Featured carousel
+
+function HeroSlide({ story, active, eager }: { story: Story; active: boolean; eager: boolean }) {
+  const { t, lang } = useUi();
+  const category = useStoryCategory(story);
+  const h = storyHeadline(story, lang);
+  const sum = storySummary(story, lang);
   return (
-    <div className="space-y-3">
-      {stories.map((s) => (
-        <StoryCard key={s.id} story={s} showImage={showImages} />
-      ))}
+    <div className={`absolute inset-0 transition-opacity duration-500 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`} aria-hidden={!active} inert={!active}>
+      <StoryImage story={story} category={category} eager={eager} className="absolute inset-0 size-full" />
+      {/* Legibility: dark gradient from the text side, and from the bottom on small screens. */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#070914] via-[#070914]/75 to-[#070914]/10 md:bg-gradient-to-r md:from-[#070914] md:via-[#070914]/80 md:to-transparent md:rtl:bg-gradient-to-l" />
+      <div className="relative flex h-full flex-col justify-end p-5 sm:p-7 md:max-w-[72%] md:justify-center lg:p-8 2xl:max-w-[62%]">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#20d98a] px-3 py-1 text-xs font-bold text-[#052016]">
+            <Star className="size-3.5 fill-current" aria-hidden />
+            {t("hero.topStory")}
+          </span>
+          <CategoryBadge id={category} />
+          {story.breaking && <span className="rounded-full bg-breaking px-2.5 py-0.5 text-xs font-semibold text-white">{t("card.breaking")}</span>}
+          {story.rumor && (
+            <span className="rounded-full bg-black/50 px-2.5 py-0.5 text-xs font-semibold text-[#f3b75c]" title={t("card.unconfirmedHint")}>
+              {t("card.unconfirmed")}
+            </span>
+          )}
+        </div>
+        <h2 lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className={`font-bold leading-tight text-white ${h.text.length > 90 ? "text-xl sm:text-2xl lg:text-[28px]" : "text-2xl sm:text-[28px] lg:text-[32px]"}`}>
+          <a href={story.url} target="_blank" rel="noopener noreferrer" onClick={() => markRead(story.leadArticleId, story.url)} className="line-clamp-3 hover:underline hover:decoration-white/50 hover:underline-offset-4">
+            {h.text}
+          </a>
+        </h2>
+        {sum && (
+          <p lang={sum.lang} dir={sum.lang === "ar" ? "rtl" : "ltr"} className="mt-3 line-clamp-3 text-[15px] leading-relaxed text-white/80 sm:text-base">
+            {sum.text}
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/75">
+          <span className="inline-flex items-center gap-2 font-medium text-white">
+            <SourceLogo source={story.source} size={18} />
+            <span dir="auto">{story.source.name}</span>
+            {story.source.official && <BadgeCheck className="size-4 text-[#20d98a]" aria-label={t("card.officialHint")} />}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-4" aria-hidden />
+            <StoryTime story={story} />
+          </span>
+          {story.sourceCount > 1 && <span>{t("card.sources", { n: story.sourceCount })}</span>}
+        </div>
+        <div className="mt-5 flex items-center gap-2">
+          <a
+            href={story.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => markRead(story.leadArticleId, story.url)}
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"
+          >
+            {t("hero.readMore")}
+            <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
+          </a>
+          <BookmarkButton story={story} tone="onImage" />
+        </div>
+      </div>
     </div>
+  );
+}
+
+function HeroCarousel({ stories }: { stories: Story[] }) {
+  const { t } = useUi();
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touch = useRef<number | null>(null);
+  const n = stories.length;
+  const current = n ? Math.min(index, n - 1) : 0;
+  const go = (i: number) => setIndex(((i % n) + n) % n);
+
+  useEffect(() => {
+    if (n < 2 || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % n), 9000);
+    return () => clearInterval(id);
+  }, [n, paused]);
+
+  if (!n) return null;
+  return (
+    <section
+      aria-roledescription="carousel"
+      aria-label={t("hero.label")}
+      className="card relative min-h-[420px] overflow-hidden border-line sm:min-h-[400px] lg:min-h-[392px]"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      onTouchStart={(e) => (touch.current = e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        if (touch.current == null) return;
+        const dx = e.changedTouches[0].clientX - touch.current;
+        touch.current = null;
+        if (Math.abs(dx) < 40) return;
+        const forward = document.documentElement.dir === "rtl" ? dx > 0 : dx < 0;
+        go(current + (forward ? 1 : -1));
+      }}
+    >
+      {stories.map((s, i) => (
+        <HeroSlide key={s.id} story={s} active={i === current} eager={i === 0} />
+      ))}
+      {n > 1 && (
+        <div className="absolute bottom-4 end-4 z-10 flex items-center gap-1.5">
+          <span dir="ltr" className="rounded-full bg-black/50 px-3 py-1 text-xs font-semibold tabular-nums text-white backdrop-blur" aria-live="polite">
+            {current + 1} / {n}
+          </span>
+          <button type="button" onClick={() => go(current - 1)} aria-label={t("hero.prev")} className="inline-flex size-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70">
+            <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
+          </button>
+          <button type="button" onClick={() => go(current + 1)} aria-label={t("hero.next")} className="inline-flex size-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70">
+            <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
+          </button>
+        </div>
+      )}
+      {n > 1 && (
+        <div className="absolute bottom-5 start-5 z-10 hidden gap-1.5 md:flex lg:start-8">
+          {stories.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => go(i)}
+              aria-label={t("hero.goto", { i: i + 1 })}
+              aria-current={i === current}
+              className={`h-1.5 rounded-full transition-all ${i === current ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/70"}`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// B. Daily Briefing
+
+function Takeaway({ facts }: { facts: BriefingFacts }) {
+  const { t, lang } = useUi();
+  const parts = [t("briefing.factStories", { n: facts.stories, h: facts.windowHours })];
+  if (facts.topCategory) parts.push(t("briefing.factCategory", { name: shortCategoryLabel(facts.topCategory.id)?.[lang] ?? facts.topCategory.id, n: facts.topCategory.count }));
+  if (facts.topCompany) parts.push(t("briefing.factCompany", { name: companyById(facts.topCompany.id)?.[lang] ?? facts.topCompany.id, n: facts.topCompany.count }));
+  return (
+    <div className="mt-4 flex gap-3 rounded-xl border border-accent/25 bg-accent-soft/70 p-3.5">
+      <Lightbulb className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+      <p className="text-sm leading-relaxed text-fg">
+        <span className="font-semibold">{t("briefing.takeaway")}: </span>
+        {parts.join(lang === "ar" ? "، " : "; ")}
+        {lang === "ar" ? "." : "."}
+      </p>
+    </div>
+  );
+}
+
+function DailyBriefing({ stories, facts }: { stories: Story[]; facts: BriefingFacts }) {
+  const { t, lang } = useUi();
+  const now = useNow();
+  return (
+    <section className="card flex h-full flex-col p-5" aria-labelledby="briefing-title">
+      <PanelTitle
+        id="briefing-title"
+        icon={
+          <IconBubble>
+            <Sparkles className="size-[18px]" aria-hidden />
+          </IconBubble>
+        }
+        title={t("briefing.title")}
+        hint={t("briefing.subtitle")}
+        action={<ViewAll href="/latest?sort=importance&range=24h" />}
+      />
+      {stories.length === 0 ? (
+        <p className="text-sm text-muted">{t("briefing.empty")}</p>
+      ) : (
+        <ul className="space-y-1">
+          {stories.map((s) => {
+            const h = storyHeadline(s, lang);
+            return (
+              <li key={s.id}>
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => markRead(s.leadArticleId, s.url)}
+                  className="group flex items-start gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-surface-2"
+                >
+                  <span className="mt-2 size-2 shrink-0 rounded-full bg-brand ring-4 ring-accent-soft" aria-hidden />
+                  <span lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="line-clamp-2 flex-1 text-[15px] font-medium leading-snug text-fg group-hover:text-accent">
+                    {h.text}
+                  </span>
+                  {s.publishedAt && <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-subtle">{formatRelative(s.publishedAt, lang, now)}</span>}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="mt-auto">
+        <Takeaway facts={facts} />
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// D. Trending Companies — news activity only, never market data.
+
+function TrendingCompanies({ companies }: { companies: CompanyPulse[] }) {
+  const { t, lang } = useUi();
+  const active = companies.filter((c) => c.count > 0).slice(0, 6);
+  const rest = companies.filter((c) => !active.includes(c));
+  return (
+    <section className="card flex h-full flex-col p-5" aria-labelledby="trending-title">
+      <PanelTitle
+        id="trending-title"
+        icon={
+          <IconBubble>
+            <Building2 className="size-[18px]" aria-hidden />
+          </IconBubble>
+        }
+        title={t("trending.title")}
+        hint={t("trending.hint")}
+        action={<ViewAll href="/companies" />}
+      />
+      {active.length === 0 ? (
+        <p className="text-sm text-muted">{t("trending.quiet")}</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {active.map((c) => {
+            const company = companyById(c.companyId);
+            const h = c.top ? storyHeadline(c.top, lang) : null;
+            return (
+              <li key={c.companyId}>
+                <Link href={`/companies?co=${c.companyId}`} className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2">
+                  <CompanyLogo id={c.companyId} size={38} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-fg">{company?.[lang] ?? c.companyId}</span>
+                    {h && (
+                      <span lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="block truncate text-xs text-muted">
+                        {h.text}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent-strong">{t("trending.count", { n: c.count })}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {rest.length > 0 && (
+        <div className="mt-auto pt-4">
+          <ul className="flex flex-wrap gap-2">
+            {rest.map((c) => {
+              const name = companyById(c.companyId)?.[lang] ?? c.companyId;
+              const label = `${name}: ${t("trending.count", { n: c.count })}`;
+              return (
+                <li key={c.companyId}>
+                  <Link href={`/companies?co=${c.companyId}`} title={label} aria-label={label} className="block rounded-[28%] opacity-75 transition-opacity hover:opacity-100">
+                    <CompanyLogo id={c.companyId} size={30} />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5" aria-busy="true">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+        <div className="skeleton h-[392px] rounded-2xl" />
+        <div className="skeleton h-[392px] rounded-2xl" />
+      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="card overflow-hidden">
+              <div className="skeleton aspect-[16/9] rounded-none" />
+              <div className="space-y-2 p-4">
+                <div className="skeleton h-4 w-4/5" />
+                <div className="skeleton h-3 w-full" />
+                <div className="skeleton h-3 w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="skeleton h-80 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
+function ListPanel({ title, hint, stories, action }: { title: string; hint?: string; stories: Story[]; action?: ReactNode }) {
+  if (!stories.length) return null;
+  return (
+    <section className="card p-5">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-bold text-fg">{title}</h2>
+          {hint && <p className="text-sm text-muted">{hint}</p>}
+        </div>
+        {action}
+      </div>
+      <ul className="divide-y divide-line">
+        {stories.map((s) => (
+          <StoryLine key={s.id} story={s} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
 export function DashboardView() {
   const { t, lang } = useUi();
   const now = useNow();
-  const { data, error, isLoading, mutate } = useSWR<DashboardResponse>("/api/dashboard", { refreshInterval: 0 });
-  const { data: prefs } = useSWR<Prefs>("/api/settings");
+  const sp = useSearchParams();
+  const update = useUpdateParams();
+  const category = sp.get("cat");
+  const key = category ? `/api/dashboard?category=${encodeURIComponent(category)}` : "/api/dashboard";
+  const { data, error, isLoading, mutate } = useSWR<DashboardResponse>(key, { refreshInterval: 0 });
   const { data: status } = useStatus();
   const newer = useHasNewer(data?.generatedAt);
-  const showImages = prefs?.showImages ?? true;
 
+  const chips = <CategoryChips value={category} onChange={(id) => update({ cat: id })} />;
   const header = (
-    <header className="mb-6">
+    <div className="mb-5 space-y-4">
       <p className="text-sm text-muted">{formatLongDate(new Date(now), lang)}</p>
-      <h1 className="mt-0.5 text-2xl font-bold text-fg sm:text-[28px]">{t("dash.title")}</h1>
-    </header>
+      {chips}
+    </div>
   );
 
   if (error) {
@@ -92,158 +401,120 @@ export function DashboardView() {
     return (
       <>
         {header}
-        <ListSkeleton rows={3} />
+        <DashboardSkeleton />
       </>
     );
   }
 
-  const empty = !data.top.length && !data.tech.length && !data.gaming.length;
-  if (empty) {
-    return (
-      <>
-        {header}
-        <EmptyState title={status && !status.lastSuccessAt ? t("list.firstRun") : t("list.empty")} />
-      </>
-    );
-  }
-
-  const [lead, ...restTop] = data.top;
-  const pulse = data.companies.filter((c) => c.count > 0).slice(0, 12);
-  const quiet = data.companies.filter((c) => c.count === 0);
+  const empty = !data.top.length && !data.latest.length;
+  const label = category ? (shortCategoryLabel(category)?.[lang] ?? category) : null;
 
   return (
     <div>
       {header}
       {newer && <NewStoriesBanner onShow={() => mutate()} />}
+      {label && (
+        <p className="-mt-1 mb-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+          {t("dash.filtered", { name: label })}
+          <button type="button" onClick={() => update({ cat: null })} className="font-medium text-accent hover:underline">
+            {t("dash.showAll")}
+          </button>
+        </p>
+      )}
 
-      {/* 1. What are the most important stories right now? */}
-      <section className="mb-10">
-        <SectionTitle title={t("dash.top")} hint={t("dash.topHint")} action={<SeeAll href="/latest?sort=importance&range=24h" />} />
-        <div className="space-y-3">
-          {lead && <StoryCard story={lead} variant="lead" showImage={showImages} />}
-          <div className="grid gap-3 md:grid-cols-2">
-            {restTop.map((s) => (
-              <StoryCard key={s.id} story={s} showImage={showImages} />
-            ))}
+      {empty ? (
+        <EmptyState title={status && !status.lastSuccessAt ? t("list.firstRun") : t("list.empty")} hint={category ? t("list.emptyHint") : undefined} />
+      ) : (
+        <div className="space-y-5">
+          {/* Row 1: featured story + daily briefing (≈70/30) */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+            <HeroCarousel stories={data.top} />
+            <DailyBriefing stories={data.briefing} facts={data.briefingFacts} />
+          </div>
+
+          {/* Row 2: latest news + trending companies */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+            <section aria-labelledby="latest-title">
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <IconBubble>
+                    <Newspaper className="size-[18px]" aria-hidden />
+                  </IconBubble>
+                  <div>
+                    <h2 id="latest-title" className="text-lg font-bold text-fg">
+                      {t("latest.title")}
+                    </h2>
+                    <p className="text-sm text-muted">{t("latest.hint")}</p>
+                  </div>
+                </div>
+                <ViewAll href={category ? `/latest?cat=${category}` : "/latest"} />
+              </div>
+              {data.latest.length ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {data.latest.map((s) => (
+                    <NewsCard key={s.id} story={s} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title={t("list.empty")} />
+              )}
+            </section>
+            <TrendingCompanies companies={data.trending} />
+          </div>
+
+          {/* Row 3: Data Radar + Weekly Tech Report */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+            <RadarPanel />
+            <ReportPanel />
+          </div>
+
+          {/* Your priority categories, in your order */}
+          {!category && data.byCategory.length > 0 && (
+            <section className="pt-3" aria-labelledby="cats-title">
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <h2 id="cats-title" className="text-lg font-bold text-fg">
+                    {t("dash.categories")}
+                  </h2>
+                  <p className="text-sm text-muted">{t("dash.categoriesHint")}</p>
+                </div>
+                <ViewAll href="/settings#categories" label={t("nav.settings")} />
+              </div>
+              <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {data.byCategory.map((c, i) => {
+                  const full = categoryLabel(c.categoryId);
+                  return (
+                    <li key={c.categoryId} className="card flex flex-col p-4">
+                      <div className="mb-2.5 flex items-baseline justify-between gap-2">
+                        <button type="button" onClick={() => update({ cat: c.categoryId })} className="text-start font-semibold text-fg hover:text-accent">
+                          <span className="me-1.5 text-xs font-semibold tabular-nums text-accent">{i + 1}</span>
+                          {full?.[lang] ?? c.categoryId}
+                        </button>
+                        <span className="shrink-0 text-xs text-subtle">{c.count ? t("list.results", { n: c.count }) : ""}</span>
+                      </div>
+                      {c.stories.length ? (
+                        <ul className="divide-y divide-line">
+                          {c.stories.map((s) => (
+                            <StoryLine key={s.id} story={s} />
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-subtle">{t("dash.categoryEmpty")}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          )}
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <ListPanel title={t("dash.announcements")} hint={t("dash.announcementsHint")} stories={data.announcements} />
+            <ListPanel title={t("dash.missed")} hint={t("dash.missedHint")} stories={data.missed} />
+            <ListPanel title={t("dash.tech")} stories={data.tech} action={<ViewAll href="/technology?range=24h" />} />
+            <ListPanel title={t("dash.gaming")} stories={data.gaming} action={<ViewAll href="/gaming?range=24h" />} />
           </div>
         </div>
-      </section>
-
-      {/* Your priority categories, in your order */}
-      {data.byCategory?.length > 0 && (
-        <section className="mb-10">
-          <SectionTitle title={t("dash.categories")} hint={t("dash.categoriesHint")} action={<SeeAll href="/settings" label={t("nav.settings")} />} />
-          <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {data.byCategory.map((c, i) => {
-              const label = categoryLabel(c.categoryId);
-              return (
-                <li key={c.categoryId} className="flex flex-col rounded-xl border border-line bg-surface p-4">
-                  <div className="mb-2 flex items-baseline justify-between gap-2">
-                    <Link href={`/latest?cat=${c.categoryId}&sort=importance&range=3d`} className="font-semibold text-fg hover:text-accent">
-                      <span className="me-1.5 text-xs font-medium text-subtle tabular-nums">{i + 1}</span>
-                      {label?.[lang] ?? c.categoryId}
-                    </Link>
-                    <span className="shrink-0 text-xs text-subtle">{c.count ? t("list.results", { n: c.count }) : ""}</span>
-                  </div>
-                  {c.stories.length ? (
-                    <ul className="divide-y divide-line">
-                      {c.stories.map((s) => (
-                        <StoryLine key={s.id} story={s} />
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-subtle">{t("dash.categoryEmpty")}</p>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      )}
-
-      {/* 2 & 3. What happened in technology today? What's biggest in gaming? */}
-      <div className="mb-10 grid gap-8 xl:grid-cols-2">
-        <section>
-          <SectionTitle title={t("dash.tech")} action={<SeeAll href="/technology?range=24h" />} />
-          <StoryColumn stories={data.tech} showImages={showImages} />
-        </section>
-        <section>
-          <SectionTitle title={t("dash.gaming")} action={<SeeAll href="/gaming?range=24h" />} />
-          <StoryColumn stories={data.gaming} showImages={showImages} />
-        </section>
-      </div>
-
-      {/* 4. What are the major companies doing? */}
-      <section className="mb-10">
-        <SectionTitle title={t("dash.companies")} hint={t("dash.companiesHint")} action={<SeeAll href="/companies" />} />
-        {pulse.length ? (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pulse.map((c) => {
-              const company = companyById(c.companyId);
-              if (!company) return null;
-              const h = c.top ? storyHeadline(c.top, lang) : null;
-              const headline = h?.text ?? null;
-              const headlineLang = h?.lang ?? "en";
-              return (
-                <li key={c.companyId} className="rounded-xl border border-line bg-surface p-4">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <Link href={`/companies?co=${c.companyId}`} className="font-semibold text-fg hover:text-accent">
-                      {company[lang]}
-                    </Link>
-                    <span className="text-xs text-subtle">{t("companies.count", { n: c.count })}</span>
-                  </div>
-                  {c.top && headline && (
-                    <a
-                      href={c.top.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      lang={headlineLang}
-                      dir={headlineLang === "ar" ? "rtl" : "ltr"}
-                      className="mt-2 line-clamp-3 block text-sm leading-relaxed text-muted hover:text-fg"
-                    >
-                      {headline}
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <EmptyState title={t("dash.noCompanyNews")} />
-        )}
-        {quiet.length > 0 && (
-          <p className="mt-3 text-sm text-subtle">
-            {t("dash.noCompanyNews")}:{" "}
-            {quiet
-              .map((c) => companyById(c.companyId)?.[lang])
-              .filter(Boolean)
-              .join(lang === "ar" ? "، " : ", ")}
-          </p>
-        )}
-      </section>
-
-      {/* 5. What important announcements should I know about? */}
-      {data.announcements.length > 0 && (
-        <section className="mb-10">
-          <SectionTitle title={t("dash.announcements")} hint={t("dash.announcementsHint")} />
-          <div className="grid gap-3 md:grid-cols-2">
-            {data.announcements.map((s) => (
-              <StoryCard key={s.id} story={s} showImage={showImages} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 6. What might I have missed? */}
-      {data.missed.length > 0 && (
-        <section className="mb-4">
-          <SectionTitle title={t("dash.missed")} hint={t("dash.missedHint")} />
-          <div className="grid gap-3 md:grid-cols-2">
-            {data.missed.map((s) => (
-              <StoryCard key={s.id} story={s} showImage={showImages} />
-            ))}
-          </div>
-        </section>
       )}
     </div>
   );

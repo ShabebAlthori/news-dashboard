@@ -7,6 +7,8 @@ import { config } from "./config";
 import { getDb, parseJsonArray } from "./db";
 import { parseFeed, type ParsedItem } from "./feed-parser";
 import { fetchFeed } from "./fetcher";
+import { refreshRadar } from "./radar";
+import { maybeGenerateWeeklyReport } from "./report";
 import { checkRobots } from "./robots";
 import { getPrefs, getSetting, setSetting } from "./settings";
 import { SOURCES, sourceById, type SourceDef } from "./sources";
@@ -253,14 +255,19 @@ function clusterNewArticles(db: Database.Database, newIds: number[]): Set<number
 // ---------------------------------------------------------------------------
 // One-time taxonomy upgrade for stories already in the database (additive only).
 
-const TAXONOMY_VERSION = 2;
+const TAXONOMY_VERSION = 3;
+/** Topics added in taxonomy v2 and companies added in v3: existing articles are re-tagged once. */
 const NEW_TOPICS = ["data", "robotics", "saudi"];
+const NEW_COMPANIES = ["databricks", "snowflake", "palantir"];
 
 export function upgradeTaxonomy(db: Database.Database): { retagged: number; restored: number } {
-  if ((getSetting<number>("taxonomy_version") ?? 1) >= TAXONOMY_VERSION) return { retagged: 0, restored: 0 };
+  const from = getSetting<number>("taxonomy_version") ?? 1;
+  if (from >= TAXONOMY_VERSION) return { retagged: 0, restored: 0 };
+  const newTopics = from < 2 ? NEW_TOPICS : [];
+  const newCompanies = from < 3 ? NEW_COMPANIES : [];
   const rows = db
     .prepare(
-      `SELECT id, source_id, title, excerpt, content_text, feed_categories, categories, excluded, exclude_reason, cluster_id
+      `SELECT id, source_id, title, excerpt, content_text, feed_categories, categories, companies, excluded, exclude_reason, cluster_id
        FROM articles WHERE excluded = 0 OR exclude_reason = 'off-topic'`,
     )
     .all() as {
@@ -271,11 +278,12 @@ export function upgradeTaxonomy(db: Database.Database): { retagged: number; rest
     content_text: string;
     feed_categories: string;
     categories: string;
+    companies: string;
     excluded: number;
     exclude_reason: string | null;
     cluster_id: number | null;
   }[];
-  const addTopics = db.prepare("UPDATE articles SET categories = ? WHERE id = ?");
+  const addTags = db.prepare("UPDATE articles SET categories = ?, companies = ? WHERE id = ?");
   const restore = db.prepare(
     `UPDATE articles SET excluded = 0, exclude_reason = NULL, ai_status = 'pending', sections = ?, categories = ?, companies = ?,
        event_type = ?, significance = ?, rumor = ?, policy = ?, clickbait = ? WHERE id = ?`,
@@ -289,16 +297,18 @@ export function upgradeTaxonomy(db: Database.Database): { retagged: number; rest
       if (!source) continue;
       const text = r.content_text.length > r.excerpt.length ? r.content_text : r.excerpt;
       const c = classify({ title: r.title, text, feedCategories: parseJsonArray(r.feed_categories), source });
-      const fresh = c.categories.filter((t) => NEW_TOPICS.includes(t));
+      const fresh = c.categories.filter((t) => newTopics.includes(t));
       if (r.excluded === 0) {
-        const current = parseJsonArray(r.categories);
-        const missing = fresh.filter((t) => !current.includes(t));
-        if (missing.length) {
-          addTopics.run(JSON.stringify([...current, ...missing]), r.id);
+        const topics = parseJsonArray(r.categories);
+        const companies = parseJsonArray(r.companies);
+        const missingTopics = fresh.filter((t) => !topics.includes(t));
+        const missingCompanies = c.companies.filter((id) => newCompanies.includes(id) && !companies.includes(id));
+        if (missingTopics.length || missingCompanies.length) {
+          addTags.run(JSON.stringify([...topics, ...missingTopics]), JSON.stringify([...companies, ...missingCompanies]), r.id);
           retagged++;
           if (r.cluster_id != null) touched.add(r.cluster_id);
         }
-      } else if (!c.excluded && (fresh.length > 0 || c.categories.includes("strategy"))) {
+      } else if (newTopics.length && !c.excluded && (fresh.length > 0 || c.categories.includes("strategy"))) {
         // Previously off-topic, now within a category (e.g. robotics, startups).
         restore.run(
           JSON.stringify(c.sections),
@@ -370,6 +380,13 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
     const skipped = outcomes.filter((o) => o === "skipped").length;
 
     clusterNewArticles(db, newIds);
+    // Data Radar sources are independent of news sources: their failures never fail a refresh.
+    try {
+      const radar = await refreshRadar(db);
+      if (radar.failed) console.warn(`[refresh] radar: ${radar.ok} ok, ${radar.failed} failed, ${radar.skipped} skipped`);
+    } catch (err) {
+      console.error("[refresh] radar failed:", err);
+    }
     let summarized = 0;
     try {
       summarized = await enrichStories(db);
@@ -377,6 +394,12 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
       console.error("[refresh] AI enrichment failed:", err);
     }
     cleanup(db);
+    try {
+      const report = maybeGenerateWeeklyReport(db);
+      if (report) console.log(`[refresh] weekly report published (${report.totals.stories} stories)`);
+    } catch (err) {
+      console.error("[refresh] weekly report failed:", err);
+    }
 
     const status: RefreshResult["status"] = ok === 0 && enabled.length > 0 ? "failed" : failed > 0 ? "partial" : "ok";
     db.prepare(

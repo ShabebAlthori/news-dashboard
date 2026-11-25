@@ -118,9 +118,41 @@ export function topicsOf(id: string): string[] {
 /** All ids accepted as a category filter: priority categories and individual topics. */
 export const FILTER_IDS = [...new Set([...PRIORITY_IDS, ...CATEGORY_IDS])];
 
+/** Dashboard category chips, in this exact order ("all" = no filter), with short labels. */
+export const DASHBOARD_CHIPS: { id: string; en: string; ar: string }[] = [
+  { id: "all", en: "All", ar: "الكل" },
+  { id: "data", en: "Data & Analytics", ar: "البيانات والتحليلات" },
+  { id: "ai", en: "AI", ar: "الذكاء الاصطناعي" },
+  { id: "business", en: "Business", ar: "الأعمال" },
+  { id: "dev", en: "Programming", ar: "البرمجة" },
+  { id: "security", en: "Cybersecurity", ar: "الأمن السيبراني" },
+  { id: "hardware-gaming", en: "Gaming", ar: "الألعاب" },
+  { id: "saudi", en: "Saudi Tech", ar: "التقنية السعودية" },
+  { id: "robotics", en: "Robotics", ar: "الروبوتات" },
+];
+
+/** Short label for a priority category (badges, chips); falls back to the full label. */
+export function shortCategoryLabel(id: string): { en: string; ar: string } | undefined {
+  return DASHBOARD_CHIPS.find((c) => c.id === id && id !== "all") ?? categoryLabel(id);
+}
+
 /** Display label for a priority category or a topic. */
 export function categoryLabel(id: string): { en: string; ar: string } | undefined {
   return PRIORITY_CATEGORIES.find((g) => g.id === id) ?? categoryById(id);
+}
+
+/**
+ * Topics that describe what a story is about. "Product announcements" is a weak signal on its
+ * own: a GTA 6 or GPU launch belongs to its subject, not to Business, when another topic exists.
+ */
+export function subjectTopics(topics: string[]): string[] {
+  return topics.length > 1 ? topics.filter((t) => t !== "products") : topics;
+}
+
+/** The category a story is labelled with (badges, report sections). */
+export function storyCategory(topics: string[], order: string[] = PRIORITY_IDS): string | undefined {
+  const subject = subjectTopics(topics);
+  return primaryCategory(subject, order) ?? (subject[0] ? groupOfTopic(subject[0]) : undefined);
 }
 
 /** The story's highest-priority category, following the reader's order. */
@@ -175,7 +207,14 @@ export const COMPANIES: CompanyDef[] = [
   { id: "bytedance", en: "ByteDance / TikTok", ar: "بايت دانس / تيك توك", tier: 2, core: false },
   { id: "epic", en: "Epic Games", ar: "إيبك جيمز", tier: 2, core: false },
   { id: "ubisoft", en: "Ubisoft", ar: "يوبيسوفت", tier: 3, core: false },
+  // Data platforms
+  { id: "databricks", en: "Databricks", ar: "داتابريكس", tier: 2, core: true },
+  { id: "snowflake", en: "Snowflake", ar: "سنوفليك", tier: 2, core: true },
+  { id: "palantir", en: "Palantir", ar: "بالانتير", tier: 2, core: true },
 ];
+
+/** Companies shown in Trending Companies, in this order when activity ties. */
+export const TRENDING_COMPANY_IDS = ["nvidia", "microsoft", "google", "apple", "amazon", "amd", "intel", "openai", "anthropic", "databricks", "snowflake", "palantir"];
 
 export const COMPANY_IDS = COMPANIES.map((c) => c.id);
 

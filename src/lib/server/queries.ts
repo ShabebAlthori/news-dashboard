@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
-import { COMPANIES, topicsOf, type EventType, type Section } from "@/lib/shared/taxonomy";
-import type { CategoryPulse, CompanyPulse, CoverageRef, DashboardResponse, Prefs, SnapshotStory, Story, StoriesResponse } from "@/lib/shared/types";
+import { topicsOf, type EventType, type Section } from "@/lib/shared/taxonomy";
+import { buildDashboard } from "@/lib/shared/rank";
+import type { CoverageRef, DashboardResponse, Prefs, SnapshotStory, Story, StoriesResponse } from "@/lib/shared/types";
 import { getDb, parseJsonArray } from "./db";
 import { coverageFactor, finalScore, impactFactor, isBreaking, relevanceFactor, tier, toRelevancePrefs, type RelevancePrefs } from "./scoring";
 import { searchTerms } from "@/lib/shared/search";
@@ -133,7 +134,7 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
       },
       url: lead.url,
       lang: src?.lang ?? "en",
-      source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official" },
+      source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official", ...(src ? { homepage: src.homepage } : {}) },
       publishedAt: iso(lead.published_at),
       fetchedAt: iso(lead.fetched_at)!,
       sections: parseJsonArray(c.sections) as Section[],
@@ -287,7 +288,7 @@ function listUngrouped(db: Database.Database, clusters: Candidate[], now: number
         summary: { en: lead.summary_en, ar: lead.summary_ar, origin: lead.summary_origin as Story["summary"]["origin"], aiModel: lead.ai_model },
         url: lead.url,
         lang: src?.lang ?? "en",
-        source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official" },
+        source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official", ...(src ? { homepage: src.homepage } : {}) },
         publishedAt: iso(lead.published_at),
         fetchedAt: iso(lead.fetched_at)!,
         coverage: [],
@@ -298,94 +299,21 @@ function listUngrouped(db: Database.Database, clusters: Candidate[], now: number
   return { stories, total: visible.length, nextCursor: offset + limit < visible.length ? offset + limit : null, generatedAt: new Date(now).toISOString() };
 }
 
-export function getDashboard(): DashboardResponse {
-  const db = getDb();
+/**
+ * The dashboard uses the same ranking engine as the web edition (lib/shared/rank.ts),
+ * run over the last week of stories with this server's preferences, saved and read state.
+ */
+export function getDashboard(category?: string | null): DashboardResponse {
   const prefs = getPrefs();
-  const now = Date.now();
-  const enabled = enabledSourceIds(db);
-  const shown = new Set<number>();
-
-  const pick = (list: Candidate[], n: number, minScore = 0) => {
-    const out: Candidate[] = [];
-    for (const c of list) {
-      if (out.length >= n) break;
-      if (shown.has(c.id) || c.score < minScore) continue;
-      out.push(c);
-      shown.add(c.id);
-    }
-    return out;
-  };
-
-  // Use the last 24 hours, widening the window on quiet days.
-  let windowHours = 24;
-  let recent = candidates(db, { from: now - windowHours * HOUR }, prefs);
-  if (recent.length < 12) {
-    windowHours = 72;
-    recent = candidates(db, { from: now - windowHours * HOUR }, prefs);
+  const stories = exportSnapshotStories(7, 3000, { keepReaderState: true });
+  const saved = new Map<string, SnapshotStory>();
+  const read = new Set<string>();
+  for (const s of stories) {
+    if (s.saved) saved.set(s.url, s);
+    if (s.read) for (const u of [s.url, ...s.coverage.map((c) => c.url)]) read.add(u);
   }
-  sortCandidates(recent, "importance");
-
-  const top = pick(recent, 6);
-  const tech = pick(recent.filter((c) => parseJsonArray(c.sections).includes("tech")), 6);
-  const gaming = pick(recent.filter((c) => parseJsonArray(c.sections).includes("gaming")), 6);
-
-  const announcementTypes = new Set(["launch", "earnings", "acquisition", "partnership", "leadership", "pricing", "layoffs", "delay"]);
-  const recent48 = candidates(db, { from: now - 48 * HOUR }, prefs);
-  sortCandidates(recent48, "importance");
-  const announcements = pick(
-    recent48.filter((c) => announcementTypes.has(c.event_type) && !c.rumor && parseJsonArray(c.companies).length > 0),
-    6,
-    45,
-  );
-
-  // Important stories from the last 4 days that the reader has not opened.
-  const older = candidates(db, { from: now - 96 * HOUR, to: now - 10 * HOUR }, prefs);
-  sortCandidates(older, "importance");
-  const readClusters = new Set(
-    (db.prepare("SELECT DISTINCT cluster_id FROM articles WHERE read_at IS NOT NULL AND cluster_id IS NOT NULL").all() as { cluster_id: number }[]).map(
-      (r) => r.cluster_id,
-    ),
-  );
-  const missed = pick(older.filter((c) => !readClusters.has(c.id)), 6, 50);
-
-  // Company pulse (last 48h) for followed companies.
-  const followed = prefs.followedCompanies.length ? prefs.followedCompanies : COMPANIES.filter((c) => c.core).map((c) => c.id);
-  const pulseRaw = followed.map((companyId) => {
-    const list = recent48.filter((c) => parseJsonArray(c.companies).includes(companyId));
-    return { companyId, count: list.length, top: list[0] ?? null };
-  });
-  const pulseTop = pulseRaw.map((p) => p.top).filter((c): c is Candidate => c !== null);
-  const pulseStories = new Map(hydrate(db, pulseTop, now, enabled).map((s) => [s.id, s]));
-  const companies: CompanyPulse[] = pulseRaw
-    .map((p) => ({ companyId: p.companyId, count: p.count, top: p.top ? (pulseStories.get(p.top.id) ?? null) : null }))
-    .sort((a, b) => b.count - a.count);
-
-  // The reader's priority categories, in their order (enabled ones only).
-  const catLists = prefs.categoryOrder
-    .filter((id) => prefs.interests.includes(id))
-    .map((categoryId) => {
-      const topics = topicsOf(categoryId);
-      const list = recent48.filter((c) => parseJsonArray(c.categories).some((t) => topics.includes(t)));
-      return { categoryId, count: list.length, top: list.slice(0, 3) };
-    });
-  const catStories = new Map(hydrate(db, [...new Map(catLists.flatMap((c) => c.top).map((c) => [c.id, c])).values()], now, enabled).map((s) => [s.id, s]));
-  const byCategory: CategoryPulse[] = catLists.map((c) => ({
-    categoryId: c.categoryId,
-    count: c.count,
-    stories: c.top.map((x) => catStories.get(x.id)).filter((s): s is Story => !!s),
-  }));
-
-  const h = (list: Candidate[]) => hydrate(db, list, now, enabled);
-  return {
-    byCategory,
-    top: h(top),
-    tech: h(tech),
-    gaming: h(gaming),
-    announcements: h(announcements),
-    missed: h(missed),
-    companies,
-    generatedAt: new Date(now).toISOString(),
-  };
+  const now = Date.now();
+  return buildDashboard(stories, { prefs, saved, read, now, generatedAt: new Date(now).toISOString() }, { category });
 }
 
 export function companyCounts(fromMs: number): Record<string, number> {
@@ -401,7 +329,7 @@ export function companyCounts(fromMs: number): Record<string, number> {
  * Every visible story from the last `days` days with its raw ranking inputs, for the
  * static web edition. Reader filters (reviews, policy) are applied in the browser.
  */
-export function exportSnapshotStories(days: number, limit = 2500): SnapshotStory[] {
+export function exportSnapshotStories(days: number, limit = 2500, opts: { keepReaderState?: boolean } = {}): SnapshotStory[] {
   const db = getDb();
   const prefs = getPrefs();
   const now = Date.now();
@@ -413,8 +341,8 @@ export function exportSnapshotStories(days: number, limit = 2500): SnapshotStory
     const c = byId.get(s.id)!;
     return {
       ...s,
-      saved: false,
-      read: false,
+      saved: opts.keepReaderState ? s.saved : false,
+      read: opts.keepReaderState ? s.read : false,
       sortTime: c.sort_time,
       lastActivity: c.last_published_at ?? c.sort_time,
       firstPublishedAt: c.first_published_at,

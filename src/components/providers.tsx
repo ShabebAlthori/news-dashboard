@@ -15,6 +15,8 @@ interface UiContextValue {
   setLang: (lang: Lang) => void;
   t: (key: I18nKey, vars?: Record<string, string | number>) => string;
   theme: ThemePref;
+  /** The theme actually shown ("system" resolved). */
+  resolvedTheme: "light" | "dark";
   setTheme: (theme: ThemePref) => void;
 }
 
@@ -40,6 +42,12 @@ export async function fetcher<T>(url: string): Promise<T> {
 
 const noopSubscribe = () => () => {};
 
+function subscribeSystemTheme(onChange: () => void) {
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
 /**
  * In the static web edition the HTML is identical for everyone, so the reader's language
  * and theme are only known in the browser (an inline script applies them before paint).
@@ -50,8 +58,9 @@ function ClientOnlyProviders({ children }: { children: ReactNode }) {
   if (!mounted) return null;
   const lang: Lang = document.documentElement.lang === "en" ? "en" : "ar";
   const m = document.cookie.match(/(?:^|; )theme=([^;]*)/);
-  const cookieTheme = m ? decodeURIComponent(m[1]) : "system";
-  const theme: ThemePref = cookieTheme === "light" || cookieTheme === "dark" ? cookieTheme : "system";
+  // Dark is the signature TechPulse look; "system" is kept for readers who chose it.
+  const cookieTheme = m ? decodeURIComponent(m[1]) : "dark";
+  const theme: ThemePref = cookieTheme === "light" || cookieTheme === "system" ? cookieTheme : "dark";
   return (
     <ProvidersInner initialLang={lang} initialTheme={theme}>
       {children}
@@ -95,6 +104,9 @@ function ProvidersInner({ initialLang, initialTheme, children }: { initialLang: 
     return () => mq.removeEventListener("change", onChange);
   }, [theme]);
 
+  const systemDark = useSyncExternalStore(subscribeSystemTheme, () => window.matchMedia("(prefers-color-scheme: dark)").matches, () => true);
+  const resolvedTheme: "light" | "dark" = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+
   const value = useMemo<UiContextValue>(
     () => ({
       lang,
@@ -102,9 +114,10 @@ function ProvidersInner({ initialLang, initialTheme, children }: { initialLang: 
       setLang,
       t: (key, vars) => translate(lang, key, vars),
       theme,
+      resolvedTheme,
       setTheme,
     }),
-    [lang, setLang, theme, setTheme],
+    [lang, setLang, theme, resolvedTheme, setTheme],
   );
 
   return (

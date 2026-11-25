@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { COMPANIES, companyById } from "@/lib/shared/taxonomy";
 import type { Prefs } from "@/lib/shared/types";
+import { CompanyLogo } from "./logos";
 import { useNow, useUi } from "./providers";
 import { PageHeader } from "./states";
 import { StoryFeed } from "./story-feed";
@@ -27,7 +28,7 @@ export function CompaniesView() {
           <ArrowLeft className="size-4 rtl:-scale-x-100" aria-hidden />
           {t("companies.back")}
         </Link>
-        <PageHeader title={company[lang]} subtitle={lang === "ar" && company.ar !== company.en ? company.en : undefined} />
+        <PageHeader icon={<CompanyLogo id={company.id} size={56} />} title={company[lang]} subtitle={lang === "ar" && company.ar !== company.en ? company.en : undefined} />
         <StoryFeed section="all" company={company.id} defaultSort="importance" defaultRange="7d" categorySections={["business"]} />
       </>
     );
@@ -45,19 +46,19 @@ export function CompaniesView() {
       {groups.map((g) => (
         <section key={g.title} className="mb-8">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{g.title}</h2>
-          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
             {[...g.list]
               .sort((a, b) => (counts?.[b.id] ?? 0) - (counts?.[a.id] ?? 0))
               .map((c) => {
                 const n = counts?.[c.id] ?? 0;
                 return (
                   <li key={c.id}>
-                    <Link
-                      href={`/companies?co=${c.id}`}
-                      className="flex h-full flex-col rounded-xl border border-line bg-surface p-3.5 hover:border-accent"
-                    >
-                      <span className="font-semibold text-fg">{c[lang]}</span>
-                      <span className={`mt-1 text-xs ${n ? "text-accent" : "text-subtle"}`}>{t("companies.count", { n })}</span>
+                    <Link href={`/companies?co=${c.id}`} className="card card-hover flex h-full items-center gap-3 p-3.5">
+                      <CompanyLogo id={c.id} size={40} />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-fg">{c[lang]}</span>
+                        <span className={`mt-0.5 block text-xs ${n ? "text-accent" : "text-subtle"}`}>{t("companies.count", { n })}</span>
+                      </span>
                     </Link>
                   </li>
                 );

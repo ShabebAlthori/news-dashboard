@@ -6,11 +6,13 @@ import { useState } from "react";
 import { mutate } from "swr";
 import { formatDateTime, formatRelative } from "@/lib/shared/format";
 import useSWR from "swr";
-import { categoryLabel, companyById, EVENT_LABELS, PRIORITY_IDS, primaryCategory, SECTIONS } from "@/lib/shared/taxonomy";
+import { companyById, EVENT_LABELS, PRIORITY_IDS, primaryCategory, SECTIONS } from "@/lib/shared/taxonomy";
 import type { Lang, Prefs, Story } from "@/lib/shared/types";
 import { storyHeadline, storySummary } from "./story-text";
 import { useNow, useUi } from "./providers";
 import { markRead, saveStory } from "@/lib/client/actions";
+import { SourceLogo } from "./logos";
+import { CategoryBadge } from "./story-visuals";
 
 const TIER_BARS = { minor: 1, standard: 2, notable: 3, major: 4 } as const;
 
@@ -40,7 +42,7 @@ function Chip({ children, tone = "neutral", title }: { children: React.ReactNode
     ok: "bg-ok-soft text-ok",
   };
   return (
-    <span title={title} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${tones[tone]}`}>
+    <span title={title} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -93,6 +95,7 @@ export function StoryCard({
   const now = useNow();
   const { data: prefs } = useSWR<Prefs>("/api/settings");
   const [override, setOverride] = useState<{ ui: Lang; view: Lang } | null>(null);
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   const [saved, setSaved] = useState(story.saved);
   const [savedFor, setSavedFor] = useState(story.saved);
   // Keep local "saved" in sync when fresh data arrives.
@@ -122,7 +125,8 @@ export function StoryCard({
   // The story's highest category in the reader's priority order.
   const primary = primaryCategory(story.categories, prefs?.categoryOrder ?? PRIORITY_IDS);
   const sectionLabel = SECTIONS.find((s) => story.sections.includes(s.id) && s.id !== "business") ?? SECTIONS.find((s) => story.sections.includes(s.id));
-  const categoryText = primary ? categoryLabel(primary)?.[uiLang] : sectionLabel?.[uiLang];
+  const categoryText = primary ? undefined : sectionLabel?.[uiLang];
+  const imageShown = variant !== "compact" && showImage && !!story.imageUrl && failedImage !== story.imageUrl;
   const businessEvent = ["acquisition", "earnings", "layoffs", "leadership", "partnership", "funding", "regulation", "security-incident", "outage", "delay", "pricing"].includes(story.eventType);
 
   async function toggleSave() {
@@ -137,8 +141,16 @@ export function StoryCard({
     variant === "lead" ? "text-xl sm:text-2xl font-bold leading-snug" : variant === "compact" ? "text-[15px] font-semibold leading-snug" : "text-lg font-semibold leading-snug";
 
   return (
-    <article className={`group rounded-xl border border-line bg-surface ${variant === "compact" ? "p-3.5" : "p-4 sm:p-5"} ${story.read ? "opacity-[0.92]" : ""}`}>
-      <div className={variant === "lead" && showImage && story.imageUrl ? "grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]" : ""}>
+    <article className={`card card-hover group ${variant === "compact" ? "p-3.5" : "p-4 sm:p-5"} ${story.read ? "opacity-[0.92]" : ""}`}>
+      <div
+        className={
+          imageShown
+            ? variant === "lead"
+              ? "grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]"
+              : "grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]"
+            : ""
+        }
+      >
         <div className="min-w-0">
           {/* Labels */}
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -147,6 +159,7 @@ export function StoryCard({
                 {t("card.breaking")}
               </Chip>
             )}
+            {primary && <CategoryBadge id={primary} />}
             {categoryText && <Chip>{categoryText}</Chip>}
             {businessEvent && <Chip>{EVENT_LABELS[story.eventType][uiLang]}</Chip>}
             {story.rumor && (
@@ -202,7 +215,8 @@ export function StoryCard({
 
           {/* Meta */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
-            <span className="inline-flex items-center gap-1 font-medium text-fg">
+            <span className="inline-flex items-center gap-1.5 font-medium text-fg">
+              <SourceLogo source={story.source} />
               <span dir="auto" className="bidi-isolate">
                 {story.source.name}
               </span>
@@ -225,7 +239,7 @@ export function StoryCard({
                 const c = companyById(id);
                 if (!c) return null;
                 return (
-                  <Link key={id} href={`/companies?co=${id}`} className="rounded border border-line px-1.5 py-0.5 text-xs text-muted hover:border-accent hover:text-accent">
+                  <Link key={id} href={`/companies?co=${id}`} className="rounded-full border border-line px-2 py-0.5 text-xs text-muted transition-colors hover:border-accent hover:text-accent">
                     {c[uiLang]}
                   </Link>
                 );
@@ -240,7 +254,7 @@ export function StoryCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => markRead(story.leadArticleId, story.url)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-fg hover:bg-surface-2"
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg transition-colors hover:bg-surface-2"
             >
               <ExternalLink className="size-3.5 rtl:-scale-x-100" aria-hidden />
               {t("card.readAt", { source: story.source.name })}
@@ -249,7 +263,7 @@ export function StoryCard({
               type="button"
               onClick={toggleSave}
               aria-pressed={saved}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-surface-2 ${saved ? "border-accent text-accent" : "border-line text-fg"}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-surface-2 ${saved ? "border-accent text-accent" : "border-line text-fg"}`}
             >
               {saved ? <BookmarkCheck className="size-3.5" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
               {saved ? t("card.saved") : t("card.save")}
@@ -259,7 +273,7 @@ export function StoryCard({
                 type="button"
                 onClick={() => setOverride({ ui: uiLang, view: otherLang })}
                 title={t("card.otherLangHint")}
-                className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-fg hover:bg-surface-2"
+                className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg transition-colors hover:bg-surface-2"
               >
                 <Languages className="size-3.5" aria-hidden />
                 <span lang={otherLang}>{otherLang === "ar" ? "العربية" : "English"}</span>
@@ -324,11 +338,30 @@ export function StoryCard({
           )}
         </div>
 
-        {variant === "lead" && showImage && story.imageUrl && (
-          <div className="order-first overflow-hidden rounded-lg bg-surface-2 md:order-none">
+        {imageShown && (
+          <a
+            href={story.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            tabIndex={-1}
+            aria-hidden
+            onClick={() => markRead(story.leadArticleId, story.url)}
+            className={`order-first block overflow-hidden rounded-xl bg-surface-2 ${variant === "lead" ? "md:order-none" : "sm:order-none sm:self-start"}`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element -- publisher-hosted thumbnails from many domains */}
-            <img src={story.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[16/9] max-h-48 w-full object-cover sm:max-h-64 md:aspect-[16/10] md:size-full md:max-h-none" />
-          </div>
+            <img
+              src={story.imageUrl!}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setFailedImage(story.imageUrl)}
+              className={
+                variant === "lead"
+                  ? "aspect-[16/9] max-h-48 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] sm:max-h-64 md:aspect-[16/10] md:size-full md:max-h-none"
+                  : "aspect-[16/9] max-h-44 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] sm:aspect-[16/11] sm:max-h-none"
+              }
+            />
+          </a>
         )}
       </div>
     </article>

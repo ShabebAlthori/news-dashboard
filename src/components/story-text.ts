@@ -2,7 +2,7 @@
 // language that text actually is (stories from Arabic sources start out Arabic-only).
 import type { Lang, Story } from "@/lib/shared/types";
 
-export function storyHeadline(story: Story, view: Lang): { text: string; lang: Lang } {
+export function storyHeadline(story: Pick<Story, "title" | "lang">, view: Lang): { text: string; lang: Lang } {
   const original: Lang = story.lang ?? "en";
   if (view === "ar") return story.title.ar ? { text: story.title.ar, lang: "ar" } : { text: story.title.original, lang: original };
   // An Arabic-source story without an English translation yet keeps its Arabic headline.
@@ -11,7 +11,7 @@ export function storyHeadline(story: Story, view: Lang): { text: string; lang: L
 }
 
 export function storySummary(
-  story: Story,
+  story: { summary: Pick<Story["summary"], "en" | "ar"> },
   view: Lang,
 ): { text: string; lang: Lang; note: "arUnavailable" | "enUnavailable" | null } | null {
   const { en, ar } = story.summary;
