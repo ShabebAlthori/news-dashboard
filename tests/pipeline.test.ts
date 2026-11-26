@@ -58,9 +58,37 @@ vi.stubGlobal("fetch", fakeFetch);
 // Mock the Claude calls (batched): echo the source faithfully, except invent a number for the delay story.
 vi.mock("../src/lib/server/ai/anthropic", () => ({
   generateWithClaude: vi.fn(async (req: { user: string }) => {
-    if (req.user.startsWith("<headlines>")) {
-      const items = JSON.parse(req.user.replace(/^<headlines>\n/, "").replace(/\n<\/headlines>$/, "")) as { id: string; target: string; headline: string }[];
-      return { model: "mock-model", data: { items: items.map((i) => ({ id: i.id, translation: `[${i.target.toUpperCase()}] ${i.headline}` })) } };
+    if (req.user.startsWith("<stories>")) {
+      // Triage: keep the rules' reading (primary "other" keeps no priority topic) — the pipeline
+      // test checks clustering and summaries, not AI classification.
+      const items = JSON.parse(req.user.replace(/^<stories>\n/, "").replace(/\n<\/stories>$/, "")) as { id: string; target: string; headline: string }[];
+      return {
+        model: "mock-model",
+        data: {
+          items: items.map((i) => {
+            const h = i.headline;
+            const [primary, secondary, companies] = /nvidia|huang/i.test(h)
+              ? ["business", "ai", ["nvidia"]]
+              : /ubisoft/i.test(h)
+                ? ["business", "hardware-gaming", ["ubisoft"]]
+                : /ناشئة/.test(h)
+                  ? ["saudi", "business", []]
+                  : /lords of the fallen/i.test(h)
+                    ? ["hardware-gaming", "none", []]
+                    : ["other", "none", []];
+            return {
+              id: i.id,
+              translation: i.target === "none" ? "" : `[${i.target.toUpperCase()}] ${h}`,
+              primary_category: primary,
+              secondary_category: secondary,
+              companies,
+              buyers_guide: false,
+              review: false,
+              opinion: false,
+            };
+          }),
+        },
+      };
     }
     const articles = [...req.user.matchAll(/<article id="([^"]+)">[\s\S]*?<original_headline>([\s\S]*?)<\/original_headline>\n<text>\n([\s\S]*?)\n<\/text>/g)].map((m) => ({
       id: m[1],
@@ -171,7 +199,9 @@ describe("refresh pipeline", () => {
     const db = dbmod.getDb();
     const stored = db.prepare("SELECT title, excerpt FROM articles WHERE id = ?").get(s.leadArticleId) as { title: string; excerpt: string };
     expect(stored.title).toBe(s.title.original); // the publisher's original headline is kept
-    expect(s.categories).toEqual(expect.arrayContaining(["saudi", "ai", "strategy"]));
+    // The AI files a story under at most two categories (here: Saudi tech + business).
+    expect(s.categories).toEqual(expect.arrayContaining(["saudi", "strategy"]));
+    expect(s.primaryCategory).toBe("saudi");
     expect(queries.listStories({ category: "saudi" }).stories.map((x) => x.id)).toContain(s.id);
   });
 

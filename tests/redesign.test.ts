@@ -238,7 +238,7 @@ describe("database migration", () => {
     const v1 = openDatabase(":memory:");
     const schema = (v1.prepare("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'radar%' AND name NOT LIKE 'weekly%' AND name NOT LIKE 'articles_fts_%' AND name NOT LIKE 'idx_radar%' AND name NOT LIKE 'sqlite_%' AND name != 'ai_cache'").all() as { sql: string }[])
       // Columns added by later migrations were not in v1.
-      .map((r) => r.sql.replace(/,\s*title_ai_attempts INTEGER NOT NULL DEFAULT 0/, ""))
+      .map((r) => r.sql.replace(/,\s*(title_ai_attempts INTEGER NOT NULL DEFAULT 0|primary_category TEXT|secondary_category TEXT|triaged_at INTEGER|embedding BLOB)/g, ""))
       .join(";\n");
     const old = new Database(file);
     old.exec(schema);
@@ -247,7 +247,7 @@ describe("database migration", () => {
     old.close();
 
     const db = openDatabase(file);
-    expect(db.pragma("user_version", { simple: true })).toBe(3);
+    expect(db.pragma("user_version", { simple: true })).toBe(4);
     expect((db.prepare("SELECT value FROM settings WHERE key = 'prefs'").get() as { value: string }).value).toContain("ai");
     expect(db.prepare("SELECT count(*) AS n FROM radar_items").get()).toEqual({ n: 0 });
     expect(db.prepare("SELECT count(*) AS n FROM weekly_reports").get()).toEqual({ n: 0 });

@@ -149,8 +149,9 @@ export function subjectTopics(topics: string[]): string[] {
   return topics.length > 1 ? topics.filter((t) => t !== "products") : topics;
 }
 
-/** The category a story is labelled with (badges, report sections). */
-export function storyCategory(topics: string[], order: string[] = PRIORITY_IDS): string | undefined {
+/** The category a story is labelled with (badges, report sections). An AI-chosen primary category wins. */
+export function storyCategory(topics: string[], order: string[] = PRIORITY_IDS, primary?: string | null): string | undefined {
+  if (primary && (PRIORITY_IDS.includes(primary) || MORE_TOPIC_IDS.includes(primary))) return primary;
   const subject = subjectTopics(topics);
   return primaryCategory(subject, order) ?? (subject[0] ? groupOfTopic(subject[0]) : undefined);
 }

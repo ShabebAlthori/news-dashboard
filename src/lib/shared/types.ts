@@ -43,6 +43,8 @@ export interface Story {
   fetchedAt: string; // when this dashboard first retrieved the lead article
   sections: Section[];
   categories: string[];
+  /** The story's main category as classified by the AI (null until then: derived from `categories`). */
+  primaryCategory?: string | null;
   companies: string[];
   eventType: EventType;
   rumor: boolean;

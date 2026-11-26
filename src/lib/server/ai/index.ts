@@ -3,7 +3,8 @@
 // Order of work in every run (each step only for stories the site shows, most important
 // and newest first):
 //   1. Reuse cached results (keyed by a hash of the canonical article URL).
-//   2. Translate missing headlines, many per request (cheap, and the most visible text).
+//   2. Triage: classify each story (primary/secondary category, subject companies, guide/review/
+//      opinion flags) and translate missing headlines — many stories per request.
 //   3. Write bilingual summaries, a few stories per request.
 // Requests are budgeted per run and per day, so the free tier is used for real work.
 //
@@ -26,18 +27,19 @@ import { generateWithGemini, getGeminiState, restoreGeminiState, type GeminiStat
 import { generateWithOllama } from "./ollama";
 import {
   buildSummaryBatchMessage,
-  buildTitleBatchMessage,
+  buildTriageMessage,
   SUMMARY_BATCH_PROMPT,
   SummaryBatchSchema,
-  TITLE_PROMPT,
-  TitleBatchSchema,
+  TRIAGE_PROMPT,
+  TriageBatchSchema,
   unverifiedNumbers,
   unverifiedNumbersIn,
   type AiOutput,
+  type TriageItem,
 } from "./prompt";
+import { triageTags } from "./triage";
 
 const HOUR = 3_600_000;
-const BUSINESS_CATEGORIES = new Set(["earnings", "acquisitions", "partnerships", "layoffs", "leadership", "strategy", "products"]);
 
 function generate<T>(req: JsonRequest<T>): Promise<{ data: T; model: string }> {
   if (config.ai.provider === "anthropic") return generateWithClaude(req);
@@ -59,21 +61,23 @@ interface CacheRow {
   summary_en: string | null;
   summary_ar: string | null;
   model: string | null;
+  /** JSON of the AI classification (TriageItem without id/translation). */
+  triage: string | null;
 }
 
 function cacheGet(db: Database.Database, url: string): CacheRow | undefined {
-  return db.prepare("SELECT title_en, title_ar, summary_en, summary_ar, model FROM ai_cache WHERE url_hash = ?").get(urlHash(url)) as CacheRow | undefined;
+  return db.prepare("SELECT title_en, title_ar, summary_en, summary_ar, model, triage FROM ai_cache WHERE url_hash = ?").get(urlHash(url)) as CacheRow | undefined;
 }
 
 /** Store fields (only non-null ones overwrite) for an article URL. */
 export function cachePut(db: Database.Database, url: string, fields: Partial<CacheRow>) {
   db.prepare(
-    `INSERT INTO ai_cache (url_hash, title_en, title_ar, summary_en, summary_ar, model, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO ai_cache (url_hash, title_en, title_ar, summary_en, summary_ar, model, triage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(url_hash) DO UPDATE SET
        title_en = COALESCE(excluded.title_en, ai_cache.title_en), title_ar = COALESCE(excluded.title_ar, ai_cache.title_ar),
        summary_en = COALESCE(excluded.summary_en, ai_cache.summary_en), summary_ar = COALESCE(excluded.summary_ar, ai_cache.summary_ar),
-       model = COALESCE(excluded.model, ai_cache.model), updated_at = excluded.updated_at`,
-  ).run(urlHash(url), fields.title_en ?? null, fields.title_ar ?? null, fields.summary_en ?? null, fields.summary_ar ?? null, fields.model ?? null, Date.now());
+       model = COALESCE(excluded.model, ai_cache.model), triage = COALESCE(excluded.triage, ai_cache.triage), updated_at = excluded.updated_at`,
+  ).run(urlHash(url), fields.title_en ?? null, fields.title_ar ?? null, fields.summary_en ?? null, fields.summary_ar ?? null, fields.model ?? null, fields.triage ?? null, Date.now());
 }
 
 /**
@@ -87,13 +91,24 @@ export function seedCacheFromSnapshot(db: Database.Database, stories: SnapshotSt
       const titleEn = s.lang === "ar" && s.title.en !== s.title.original ? s.title.en : null;
       const titleAr = s.lang !== "ar" ? s.title.ar : null;
       const ai = s.summary.origin === "ai";
-      if (!titleEn && !titleAr && !ai) continue;
+      const triage = s.primaryCategory
+        ? JSON.stringify({
+            primary_category: s.primaryCategory,
+            secondary_category: "none",
+            companies: s.companies,
+            buyers_guide: false,
+            review: s.eventType === "review",
+            opinion: s.eventType === "opinion",
+          })
+        : null;
+      if (!titleEn && !titleAr && !ai && !triage) continue;
       cachePut(db, s.url, {
         title_en: titleEn ?? (ai ? s.title.en : null),
         title_ar: titleAr,
         summary_en: ai ? s.summary.en : null,
         summary_ar: ai ? s.summary.ar : null,
         model: s.summary.aiModel,
+        triage,
       });
       n++;
     }
@@ -146,6 +161,16 @@ export function pendingAiCount(db: Database.Database): number {
   ).n;
 }
 
+/** Stories still waiting for AI classification. */
+export function pendingTriageCount(db: Database.Database): number {
+  if (config.ai.provider === "none") return 0;
+  return (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM articles a JOIN clusters c ON c.lead_article_id = a.id WHERE ${ELIGIBLE} AND a.title_ai_attempts < 3 AND (a.triaged_at IS NULL OR ${NEEDS_TITLE})`)
+      .get({ since: windowStart(Date.now()) }) as { n: number }
+  ).n;
+}
+
 export function pendingTitleCount(db: Database.Database): number {
   if (config.ai.provider === "none") return 0;
   const now = Date.now();
@@ -175,16 +200,19 @@ interface LeadRow {
   cluster_id: number;
   title_en: string | null;
   title_ar: string | null;
+  sections: string;
+  event_type: string;
+  triaged_at: number | null;
 }
 
 const LEAD_COLUMNS = `a.id, a.source_id, a.url, a.title, a.excerpt, a.content_text, a.published_at, a.categories, a.companies, a.rumor,
-  a.ai_attempts, a.ai_status, a.cluster_id, a.title_en, a.title_ar`;
+  a.ai_attempts, a.ai_status, a.cluster_id, a.title_en, a.title_ar, a.sections, a.event_type, a.triaged_at`;
 
 function applyCache(db: Database.Database, now: number): number {
   const rows = db
     .prepare(
       `SELECT ${LEAD_COLUMNS} FROM articles a JOIN clusters c ON c.lead_article_id = a.id
-       WHERE ${ELIGIBLE} AND (${NEEDS_TITLE} OR ${NEEDS_SUMMARY})`,
+       WHERE ${ELIGIBLE} AND (${NEEDS_TITLE} OR ${NEEDS_SUMMARY} OR a.triaged_at IS NULL)`,
     )
     .all({ since: windowStart(now) }) as LeadRow[];
   let applied = 0;
@@ -198,13 +226,23 @@ function applyCache(db: Database.Database, now: number): number {
       const hit = cacheGet(db, r.url);
       if (!hit) continue;
       const arabic = ARABIC_SOURCES.includes(r.source_id);
+      let used = false;
+      if (r.triaged_at == null && hit.triage) {
+        try {
+          applyTriage(db, r, { id: String(r.id), translation: "", ...(JSON.parse(hit.triage) as Omit<TriageItem, "id" | "translation">) });
+          used = true;
+        } catch {
+          // ignore a malformed cache entry; the story is classified again
+        }
+      }
       if ((r.ai_status === "pending" || r.ai_status === "failed") && hit.summary_en && hit.summary_ar) {
         setSummary.run(hit.title_en, arabic ? null : hit.title_ar, hit.summary_en, hit.summary_ar, hit.model, now, r.id);
-        applied++;
+        used = true;
       } else if ((arabic && !r.title_en && hit.title_en) || (!arabic && !r.title_ar && hit.title_ar)) {
         setTitle.run(arabic ? hit.title_en : null, arabic ? null : hit.title_ar, r.id);
-        applied++;
+        used = true;
       }
+      if (used) applied++;
     }
   });
   tx();
@@ -240,35 +278,74 @@ async function request<T>(state: StepState, req: JsonRequest<T>): Promise<{ data
   }
 }
 
-async function translateTitles(db: Database.Database, state: StepState, now: number): Promise<number> {
+function applyTriage(db: Database.Database, row: LeadRow, item: TriageItem) {
+  const src = sourceById(row.source_id);
+  const tags = triageTags(
+    {
+      categories: parseJsonArray(row.categories),
+      sections: parseJsonArray(row.sections),
+      eventType: row.event_type,
+      sourceSection: src?.section ?? "tech",
+      sourceCompany: src?.company,
+    },
+    item,
+  );
+  db.prepare(
+    `UPDATE articles SET primary_category = ?, secondary_category = ?, categories = ?, sections = ?, companies = ?, event_type = ?, triaged_at = ?
+     WHERE id = ?`,
+  ).run(tags.primary, tags.secondary, JSON.stringify(tags.categories), JSON.stringify(tags.sections), JSON.stringify(tags.companies), tags.eventType, Date.now(), row.id);
+  recomputeCluster(db, row.cluster_id);
+}
+
+/** Classify stories and translate missing headlines, many per request. */
+async function triage(db: Database.Database, state: StepState, now: number): Promise<{ classified: number; titles: number }> {
   const limit = state.requestsLeft * config.ai.titleBatch;
-  if (limit <= 0) return 0;
+  if (limit <= 0) return { classified: 0, titles: 0 };
   const rows = db
     .prepare(
       `SELECT ${LEAD_COLUMNS} FROM articles a JOIN clusters c ON c.lead_article_id = a.id
-       WHERE ${ELIGIBLE} AND a.title_ai_attempts < 3 AND ${NEEDS_TITLE}
+       WHERE ${ELIGIBLE} AND a.title_ai_attempts < 3 AND (a.triaged_at IS NULL OR ${NEEDS_TITLE})
        ORDER BY ${PRIORITY} LIMIT @limit`,
     )
     .all({ since: windowStart(now), now, limit }) as LeadRow[];
   const failed = db.prepare("UPDATE articles SET title_ai_attempts = title_ai_attempts + 1 WHERE id = ?");
   const setEn = db.prepare("UPDATE articles SET title_en = ? WHERE id = ?");
   const setAr = db.prepare("UPDATE articles SET title_ar = ? WHERE id = ?");
-  let done = 0;
+  const needsTitle = (r: LeadRow) => (ARABIC_SOURCES.includes(r.source_id) ? !r.title_en : !r.title_ar);
+  let classified = 0;
+  let titles = 0;
   for (let i = 0; i < rows.length && !state.stoppedBy; i += config.ai.titleBatch) {
     const batch = rows.slice(i, i + config.ai.titleBatch);
-    const items = batch.map((r) => ({ id: String(r.id), target: (ARABIC_SOURCES.includes(r.source_id) ? "en" : "ar") as "en" | "ar", headline: r.title }));
-    let res: Awaited<ReturnType<typeof request<{ items: { id: string; translation: string }[] }>>>;
+    const items = batch.map((r) => ({
+      id: String(r.id),
+      target: (needsTitle(r) ? (ARABIC_SOURCES.includes(r.source_id) ? "en" : "ar") : "none") as "en" | "ar" | "none",
+      headline: r.title,
+      lead: r.excerpt,
+    }));
+    let res: Awaited<ReturnType<typeof request<{ items: TriageItem[] }>>>;
     try {
-      res = await request(state, { system: TITLE_PROMPT, user: buildTitleBatchMessage(items), schema: TitleBatchSchema, maxOutputTokens: 6000 });
+      res = await request(state, { system: TRIAGE_PROMPT, user: buildTriageMessage(items), schema: TriageBatchSchema, maxOutputTokens: 8000, timeoutMs: 90_000 });
     } catch {
       for (const r of batch) failed.run(r.id);
       continue;
     }
     if (!res) break;
-    const byId = new Map(res.data.items.map((it) => [it.id, it.translation.trim()]));
+    const byId = new Map(res.data.items.map((it) => [it.id, it]));
     const tx = db.transaction(() => {
       for (const r of batch) {
-        const tr = byId.get(String(r.id));
+        const item = byId.get(String(r.id));
+        if (!item) {
+          failed.run(r.id);
+          continue;
+        }
+        applyTriage(db, r, item);
+        const { id: _id, translation: _tr, ...classification } = item;
+        void _id;
+        void _tr;
+        cachePut(db, r.url, { triage: JSON.stringify(classification), model: res.model });
+        classified++;
+        if (!needsTitle(r)) continue;
+        const tr = item.translation.trim();
         const target = ARABIC_SOURCES.includes(r.source_id) ? "en" : "ar";
         const ok = !!tr && tr !== r.title && unverifiedNumbersIn([tr], r.title, r.published_at).length === 0;
         if (!ok) {
@@ -277,29 +354,26 @@ async function translateTitles(db: Database.Database, state: StepState, now: num
         }
         (target === "en" ? setEn : setAr).run(tr, r.id);
         cachePut(db, r.url, target === "en" ? { title_en: tr, model: res.model } : { title_ar: tr, model: res.model });
-        done++;
+        titles++;
       }
     });
     tx();
   }
-  return done;
+  return { classified, titles };
 }
 
+/**
+ * Store a bilingual summary. Categories and companies are not changed here: they come from the
+ * triage step, which sees every story, so one source of truth decides how a story is filed.
+ */
 function applyOutput(db: Database.Database, row: LeadRow, output: AiOutput, model: string) {
-  const ruleCategories = parseJsonArray(row.categories);
-  // Topic categories: prefer the model's reading when it gave one; always keep business categories from rules.
-  const topical = output.categories.filter((c) => !BUSINESS_CATEGORIES.has(c));
-  const categories = [
-    ...new Set([...(topical.length ? topical : ruleCategories.filter((c) => !BUSINESS_CATEGORIES.has(c))), ...ruleCategories.filter((c) => BUSINESS_CATEGORIES.has(c))]),
-  ].slice(0, 4);
-  const companies = [...new Set([...parseJsonArray(row.companies), ...output.companies])];
   const excluded = output.excluded_topic !== "none";
   const arabic = ARABIC_SOURCES.includes(row.source_id);
 
   db.prepare(
     `UPDATE articles SET title_en = ?, title_ar = ?, summary_en = ?, summary_ar = ?, summary_origin = 'ai',
        ai_status = 'done', ai_model = ?, ai_significance = ?, ai_error = NULL, ai_at = ?, ai_attempts = ai_attempts + 1,
-       rumor = ?, categories = ?, companies = ?,
+       rumor = ?,
        excluded = CASE WHEN ? THEN 1 ELSE excluded END,
        exclude_reason = CASE WHEN ? THEN ? ELSE exclude_reason END
      WHERE id = ?`,
@@ -313,8 +387,6 @@ function applyOutput(db: Database.Database, row: LeadRow, output: AiOutput, mode
     Math.min(5, Math.max(1, Math.round(output.significance))),
     Date.now(),
     row.rumor || output.speculative ? 1 : 0,
-    JSON.stringify(categories),
-    JSON.stringify(companies),
     excluded ? 1 : 0,
     excluded ? 1 : 0,
     `ai:${output.excluded_topic}`,
@@ -418,6 +490,8 @@ async function summarize(db: Database.Database, state: StepState, now: number, m
 
 export interface EnrichResult {
   cached: number;
+  /** Stories classified by the triage step. */
+  classified: number;
   titles: number;
   summaries: number;
   requests: number;
@@ -429,7 +503,7 @@ export interface EnrichResult {
 
 /** Translate headlines, then summarize the most important un-summarized stories. */
 export async function enrichStories(db: Database.Database, opts: { maxArticles?: number } = {}): Promise<EnrichResult> {
-  const empty: EnrichResult = { cached: 0, titles: 0, summaries: 0, requests: 0, errors: {}, stoppedBy: null, pendingTitles: 0, pendingSummaries: 0 };
+  const empty: EnrichResult = { cached: 0, classified: 0, titles: 0, summaries: 0, requests: 0, errors: {}, stoppedBy: null, pendingTitles: 0, pendingSummaries: 0 };
   if (config.ai.provider === "none") return empty;
 
   // Publishers that opt out of AI use (robots.txt Content-Signal ai-input=no) are never sent to a model.
@@ -449,13 +523,14 @@ export async function enrichStories(db: Database.Database, opts: { maxArticles?:
   };
 
   if (config.ai.provider === "gemini") restoreGeminiState(getSetting<GeminiState>("gemini_state"));
+  let classified = 0;
   let titles = 0;
   let summaries = 0;
   try {
-    titles = await translateTitles(db, state, now);
+    ({ classified, titles } = await triage(db, state, now));
     summaries = await summarize(db, state, now, maxStories);
   } finally {
     if (config.ai.provider === "gemini") setSetting("gemini_state", getGeminiState());
   }
-  return { cached, titles, summaries, requests: state.requests, errors: state.errors, stoppedBy: state.stoppedBy, pendingTitles: pendingTitleCount(db), pendingSummaries: pendingAiCount(db) };
+  return { cached, classified, titles, summaries, requests: state.requests, errors: state.errors, stoppedBy: state.stoppedBy, pendingTitles: pendingTitleCount(db), pendingSummaries: pendingAiCount(db) };
 }

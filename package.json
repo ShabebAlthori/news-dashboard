@@ -12,7 +12,8 @@
     "refresh": "tsx scripts/refresh.ts",
     "worker": "tsx scripts/worker.ts",
     "build:static": "node scripts/build-static.mjs",
-    "export:static": "tsx scripts/export-static.ts"
+    "export:static": "tsx scripts/export-static.ts",
+    "review:tags": "tsx scripts/review-tags.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",

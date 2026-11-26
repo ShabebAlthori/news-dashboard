@@ -13,6 +13,7 @@ const HOUR = 3_600_000;
 interface ClusterRow {
   id: number;
   lead_article_id: number;
+  primary_category?: string | null;
   first_published_at: number | null;
   last_published_at: number | null;
   sort_time: number;
@@ -139,6 +140,7 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
       fetchedAt: iso(lead.fetched_at)!,
       sections: parseJsonArray(c.sections) as Section[],
       categories,
+      primaryCategory: c.primary_category ?? null,
       companies,
       eventType: c.event_type as EventType,
       rumor: c.rumor === 1,
@@ -213,7 +215,7 @@ function candidates(db: Database.Database, q: StoryQuery, prefs: Prefs, opts: { 
   }
   const rows = db
     .prepare(
-      `SELECT c.id, c.lead_article_id, c.first_published_at, c.last_published_at, c.sort_time, c.first_seen_at, c.source_count,
+      `SELECT c.id, c.lead_article_id, c.primary_category, c.first_published_at, c.last_published_at, c.sort_time, c.first_seen_at, c.source_count,
               c.sections, c.categories, c.companies, c.event_type, c.significance, c.credibility, c.rumor, c.policy, c.penalties, c.base_score
        FROM clusters c WHERE ${where.join(" AND ")}`,
     )

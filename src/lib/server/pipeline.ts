@@ -7,6 +7,7 @@ import { config } from "./config";
 import { getDb, parseJsonArray } from "./db";
 import { parseFeed, type ParsedItem } from "./feed-parser";
 import { fetchFeed } from "./fetcher";
+import { mergeDuplicateStories } from "./merge";
 import { refreshRadar } from "./radar";
 import { maybeGenerateWeeklyReport } from "./report";
 import { checkRobots } from "./robots";
@@ -400,6 +401,13 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
     } catch (err) {
       console.error("[refresh] AI enrichment failed:", err);
     }
+    // Merge the same event told in other words or another language (multilingual embeddings).
+    try {
+      const merge = await mergeDuplicateStories(db);
+      console.log(`[merge] ${JSON.stringify(merge)}`);
+    } catch (err) {
+      console.error("[refresh] duplicate merging failed:", (err as Error).message);
+    }
     cleanup(db);
     try {
       const report = maybeGenerateWeeklyReport(db);
@@ -422,7 +430,7 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
       newArticles: newIds.length,
       summarized,
       translatedTitles: ai?.titles ?? 0,
-      ...(ai ? { ai: { cached: ai.cached, requests: ai.requests, errors: ai.errors, stoppedBy: ai.stoppedBy, pendingTitles: ai.pendingTitles, pendingSummaries: ai.pendingSummaries } } : {}),
+      ...(ai ? { ai: { cached: ai.cached, classified: ai.classified, requests: ai.requests, errors: ai.errors, stoppedBy: ai.stoppedBy, pendingTitles: ai.pendingTitles, pendingSummaries: ai.pendingSummaries } } : {}),
       durationMs: Date.now() - started,
     };
   } catch (err) {

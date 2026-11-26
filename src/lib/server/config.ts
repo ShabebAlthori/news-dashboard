@@ -55,6 +55,10 @@ export const config = {
       .map((m) => m.trim())
       .filter(Boolean),
     geminiBaseUrl: (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, ""),
+    /** Multilingual embedding model used to merge the same story told in different words or languages. */
+    geminiEmbedModel: process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001",
+    /** Cosine similarity from which two stories (from different publishers) are merged. */
+    mergeThreshold: Math.min(0.99, Math.max(0.7, Number.parseFloat(process.env.EMBED_MERGE_THRESHOLD ?? "") || 0.86)),
     /** Free-tier friendly spacing between Gemini requests. */
     geminiMinIntervalMs: int("GEMINI_MIN_INTERVAL_MS", 6500, 0, 60000),
     geminiRetryDelayMs: int("GEMINI_RETRY_DELAY_MS", 8000, 0, 60000),

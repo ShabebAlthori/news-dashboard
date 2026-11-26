@@ -45,7 +45,7 @@ export function buildWeeklyReport(stories: SnapshotStory[], radar: RadarItem[], 
   const highlights: SnapshotStory[] = [];
   for (const s of inWeek) {
     if (highlights.length >= 5) break;
-    const cat = storyCategory(s.categories) ?? "other";
+    const cat = storyCategory(s.categories, undefined, s.primaryCategory) ?? "other";
     const n = perCategory.get(cat) ?? 0;
     if (n >= 2) continue;
     perCategory.set(cat, n + 1);
@@ -56,7 +56,7 @@ export function buildWeeklyReport(stories: SnapshotStory[], radar: RadarItem[], 
     const topics = topicsOf(id);
     const all = inWeek.filter((s) => s.categories.some((t) => topics.includes(t)));
     // Each story appears once in the report: under its highest-priority category.
-    const own = all.filter((s) => !used.has(s.id) && storyCategory(s.categories) === id).slice(0, 4);
+    const own = all.filter((s) => !used.has(s.id) && storyCategory(s.categories, undefined, s.primaryCategory) === id).slice(0, 4);
     for (const s of own) used.add(s.id);
     return { id, count: all.length, stories: own.map(slim) };
   }).filter((sec) => sec.count > 0);

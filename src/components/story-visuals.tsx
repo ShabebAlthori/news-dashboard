@@ -40,7 +40,7 @@ export function categoryTint(id: string | undefined) {
 /** The story's category in the reader's priority order. */
 export function useStoryCategory(story: Story): string | undefined {
   const { data: prefs } = useSWR<Prefs>("/api/settings");
-  return storyCategory(story.categories, prefs?.categoryOrder ?? PRIORITY_IDS);
+  return storyCategory(story.categories, prefs?.categoryOrder ?? PRIORITY_IDS, story.primaryCategory);
 }
 
 export function CategoryBadge({ id, className = "" }: { id: string | undefined; className?: string }) {

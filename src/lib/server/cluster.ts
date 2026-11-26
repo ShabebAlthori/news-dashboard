@@ -127,6 +127,7 @@ interface MemberRow {
   clickbait: number;
   excluded: number;
   image_url: string | null;
+  primary_category: string | null;
 }
 
 function leadScore(m: MemberRow): number {
@@ -145,7 +146,7 @@ export function recomputeCluster(db: Database.Database, clusterId: number): void
   const members = db
     .prepare(
       `SELECT id, source_id, title, excerpt, published_at, fetched_at, sections, categories, companies, event_type,
-              significance, ai_significance, ai_status, rumor, policy, clickbait, excluded, image_url
+              significance, ai_significance, ai_status, rumor, policy, clickbait, excluded, image_url, primary_category
        FROM articles WHERE cluster_id = ?`,
     )
     .all(clusterId) as MemberRow[];
@@ -210,7 +211,8 @@ export function recomputeCluster(db: Database.Database, clusterId: number): void
   db.prepare(
     `UPDATE clusters SET lead_article_id = ?, first_published_at = ?, last_published_at = ?, sort_time = ?, first_seen_at = ?,
        updated_at = ?, article_count = ?, source_count = ?, sections = ?, categories = ?, companies = ?, event_type = ?,
-       significance = ?, credibility = ?, has_official = ?, rumor = ?, policy = ?, penalties = ?, base_score = ?, excluded = 0
+       significance = ?, credibility = ?, has_official = ?, rumor = ?, policy = ?, penalties = ?, base_score = ?, excluded = 0,
+       primary_category = ?
      WHERE id = ?`,
   ).run(
     lead.id,
@@ -232,6 +234,7 @@ export function recomputeCluster(db: Database.Database, clusterId: number): void
     policy ? 1 : 0,
     penalties,
     Math.round(base * 100) / 100,
+    lead.primary_category ?? active.find((m) => m.primary_category)?.primary_category ?? null,
     clusterId,
   );
 }

@@ -232,10 +232,8 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
   }
   briefingPicks.sort((a, b) => b.score - a.score);
   const catCounts = new Map<string, number>();
-  const coCounts = new Map<string, number>();
   for (const s of day) {
     for (const g of new Set(subjectTopics(s.categories).map(groupOfTopic))) if (PRIORITY_IDS.includes(g)) catCounts.set(g, (catCounts.get(g) ?? 0) + 1);
-    for (const c of s.companies) coCounts.set(c, (coCounts.get(c) ?? 0) + 1);
   }
   // Highest count; ties go to the reader's higher-priority category (or the first seen).
   const rankOf = (id: string) => {
@@ -289,7 +287,12 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
       .sort((a, b) => b.count - a.count);
   const followed = ctx.prefs.followedCompanies.length ? ctx.prefs.followedCompanies : COMPANIES.filter((c) => c.core).map((c) => c.id);
   const companies = pulse(followed);
-  const trending = pulse(TRENDING_COMPANY_IDS);
+  // Trending Companies and the key takeaway share one count: stories per company in 48 hours.
+  // The configured companies are always listed; any other tracked company joins when it is busier.
+  const trending = pulse([...new Set([...TRENDING_COMPANY_IDS, ...COMPANIES.map((c) => c.id)])]).filter(
+    (p) => TRENDING_COMPANY_IDS.includes(p.companyId) || p.count > 0,
+  );
+  const busiest = trending.find((p) => p.count > 0);
 
   const all48 = category ? rank(stories, { from: now - 48 * HOUR }, ctx) : recent48;
   if (category) sortRanked(all48, "importance");
@@ -304,7 +307,7 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
     byCategory,
     top,
     briefing: briefingPicks.map(strip),
-    briefingFacts: { windowHours: briefWindow, stories: day.length, topCategory: category ? null : best(catCounts, true), topCompany: best(coCounts) },
+    briefingFacts: { windowHours: briefWindow, stories: day.length, topCategory: category ? null : best(catCounts, true), topCompany: busiest ? { id: busiest.companyId, count: busiest.count } : null },
     latest,
     trending,
     tech,

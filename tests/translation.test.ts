@@ -17,12 +17,23 @@ let inventNumberFor: string | null = null;
 
 vi.mock("../src/lib/server/ai/anthropic", () => ({
   generateWithClaude: vi.fn(async (req: { user: string }) => {
-    if (req.user.startsWith("<headlines>")) {
-      const items = JSON.parse(req.user.slice("<headlines>\n".length, -"\n</headlines>".length)) as { id: string; target: string; headline: string }[];
+    if (req.user.startsWith("<stories>")) {
+      const items = JSON.parse(req.user.slice("<stories>\n".length, -"\n</stories>".length)) as { id: string; target: string; headline: string }[];
       calls.push({ kind: "titles", ids: items.map((i) => i.id) });
       return {
         model: "mock",
-        data: { items: items.map((i) => ({ id: i.id, translation: i.headline === inventNumberFor ? `${i.headline} 999` : `«${i.target}» ${i.headline}` })) },
+        data: {
+          items: items.map((i) => ({
+            id: i.id,
+            translation: i.target === "none" ? "" : i.headline === inventNumberFor ? `${i.headline} 999` : `«${i.target}» ${i.headline}`,
+            primary_category: "ai",
+            secondary_category: "none",
+            companies: [],
+            buyers_guide: false,
+            review: false,
+            opinion: false,
+          })),
+        },
       };
     }
     const ids = [...req.user.matchAll(/<article id="(\d+)">/g)].map((m) => m[1]);

@@ -213,6 +213,16 @@ const MIGRATIONS: string[] = [
   );
   ALTER TABLE articles ADD COLUMN title_ai_attempts INTEGER NOT NULL DEFAULT 0;
   `,
+  // v4 — AI classification (one primary category, an optional secondary one, subject companies
+  // and guide/review/opinion flags) and multilingual embeddings for merging duplicate stories.
+  `
+  ALTER TABLE articles ADD COLUMN primary_category TEXT;
+  ALTER TABLE articles ADD COLUMN secondary_category TEXT;
+  ALTER TABLE articles ADD COLUMN triaged_at INTEGER;
+  ALTER TABLE articles ADD COLUMN embedding BLOB;
+  ALTER TABLE clusters ADD COLUMN primary_category TEXT;
+  ALTER TABLE ai_cache ADD COLUMN triage TEXT;
+  `,
 ];
 
 function migrate(db: DB) {
