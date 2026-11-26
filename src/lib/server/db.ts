@@ -199,6 +199,20 @@ const MIGRATIONS: string[] = [
     data TEXT NOT NULL
   );
   `,
+  // v3 — translation cache keyed by a hash of the canonical article URL, so nothing is
+  // translated twice (also seeded from the last published snapshot if the database is lost).
+  `
+  CREATE TABLE IF NOT EXISTS ai_cache (
+    url_hash TEXT PRIMARY KEY,
+    title_en TEXT,
+    title_ar TEXT,
+    summary_en TEXT,
+    summary_ar TEXT,
+    model TEXT,
+    updated_at INTEGER NOT NULL
+  );
+  ALTER TABLE articles ADD COLUMN title_ai_attempts INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 function migrate(db: DB) {

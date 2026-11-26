@@ -7,7 +7,7 @@ import type { Story } from "@/lib/shared/types";
 import { SourceLogo } from "./logos";
 import { useNow, useUi } from "./providers";
 import { storyHeadline, storySummary } from "./story-text";
-import { BookmarkButton, CategoryBadge, StoryImage, useStoryCategory } from "./story-visuals";
+import { BookmarkButton, CategoryBadge, OriginalLangTag, StoryImage, useStoryCategory } from "./story-visuals";
 
 export function StoryTime({ story, className = "", compact = false }: { story: Story; className?: string; compact?: boolean }) {
   const { t, lang } = useUi();
@@ -42,6 +42,7 @@ export function NewsCard({ story }: { story: Story }) {
         <span className="absolute bottom-3 start-3 flex flex-wrap gap-1.5">
           <CategoryBadge id={category} />
           {story.breaking && <span className="rounded-full bg-breaking px-2.5 py-0.5 text-xs font-semibold text-white">{t("card.breaking")}</span>}
+          <OriginalLangTag langs={[h.lang, sum?.lang]} tone="onImage" />
         </span>
       </a>
       <div className="flex flex-1 flex-col p-4">
@@ -92,6 +93,7 @@ export function StoryLine({ story, showSource = true }: { story: Story; showSour
       <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
         {showSource && <span dir="auto">{story.source.name}</span>}
         {showSource && <span aria-hidden>·</span>}
+        <OriginalLangTag langs={[h.lang]} />
         <StoryTime story={story} compact />
         {story.sourceCount > 1 && <span>· {t("card.sources", { n: story.sourceCount })}</span>}
         {story.tier === "major" && <span className="font-semibold text-accent">· {t("importance.major")}</span>}

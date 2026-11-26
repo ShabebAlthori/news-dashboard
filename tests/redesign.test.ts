@@ -236,8 +236,9 @@ describe("database migration", () => {
     const file = `/tmp/claude-migrate-${process.pid}-${Date.now()}.db`;
     // Simulate a database created by the previous version (schema v1 only).
     const v1 = openDatabase(":memory:");
-    const schema = (v1.prepare("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'radar%' AND name NOT LIKE 'weekly%' AND name NOT LIKE 'articles_fts_%' AND name NOT LIKE 'idx_radar%' AND name NOT LIKE 'sqlite_%'").all() as { sql: string }[])
-      .map((r) => r.sql)
+    const schema = (v1.prepare("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'radar%' AND name NOT LIKE 'weekly%' AND name NOT LIKE 'articles_fts_%' AND name NOT LIKE 'idx_radar%' AND name NOT LIKE 'sqlite_%' AND name != 'ai_cache'").all() as { sql: string }[])
+      // Columns added by later migrations were not in v1.
+      .map((r) => r.sql.replace(/,\s*title_ai_attempts INTEGER NOT NULL DEFAULT 0/, ""))
       .join(";\n");
     const old = new Database(file);
     old.exec(schema);
@@ -246,10 +247,12 @@ describe("database migration", () => {
     old.close();
 
     const db = openDatabase(file);
-    expect(db.pragma("user_version", { simple: true })).toBe(2);
+    expect(db.pragma("user_version", { simple: true })).toBe(3);
     expect((db.prepare("SELECT value FROM settings WHERE key = 'prefs'").get() as { value: string }).value).toContain("ai");
     expect(db.prepare("SELECT count(*) AS n FROM radar_items").get()).toEqual({ n: 0 });
     expect(db.prepare("SELECT count(*) AS n FROM weekly_reports").get()).toEqual({ n: 0 });
+    expect(db.prepare("SELECT count(*) AS n FROM ai_cache").get()).toEqual({ n: 0 });
+    expect((db.prepare("PRAGMA table_info(articles)").all() as { name: string }[]).some((c) => c.name === "title_ai_attempts")).toBe(true);
     db.close();
   });
 });

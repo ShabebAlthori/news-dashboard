@@ -5,7 +5,7 @@ import { useState } from "react";
 import useSWR, { mutate } from "swr";
 import { saveStory } from "@/lib/client/actions";
 import { PRIORITY_IDS, shortCategoryLabel, storyCategory } from "@/lib/shared/taxonomy";
-import type { Prefs, Story } from "@/lib/shared/types";
+import type { Lang, Prefs, Story } from "@/lib/shared/types";
 import { useUi } from "./providers";
 
 export const CATEGORY_ICONS: Record<string, typeof Star> = {
@@ -97,6 +97,21 @@ export function StoryImage({ story, category, className = "", eager = false }: {
       onError={() => setFailedUrl(story.imageUrl)}
       className={`object-cover ${className}`}
     />
+  );
+}
+
+/**
+ * Shown when a headline or summary is not available in the reader's language yet, so the
+ * other language is never shown silently. `tone="onImage"` for use over photos.
+ */
+export function OriginalLangTag({ langs, tone = "default", className = "" }: { langs: (Lang | null | undefined)[]; tone?: "default" | "onImage"; className?: string }) {
+  const { t, lang } = useUi();
+  if (!langs.some((l) => l && l !== lang)) return null;
+  const tones = tone === "onImage" ? "border-white/25 bg-black/55 text-white/90 backdrop-blur" : "border-line bg-surface-2 text-muted";
+  return (
+    <span title={t("card.originalLangHint")} className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-4 ${tones} ${className}`}>
+      {t("card.originalLang")}
+    </span>
   );
 }
 

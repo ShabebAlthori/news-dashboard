@@ -12,7 +12,7 @@ import { storyHeadline, storySummary } from "./story-text";
 import { useNow, useUi } from "./providers";
 import { markRead, saveStory } from "@/lib/client/actions";
 import { SourceLogo } from "./logos";
-import { CategoryBadge } from "./story-visuals";
+import { CategoryBadge, OriginalLangTag } from "./story-visuals";
 
 const TIER_BARS = { minor: 1, standard: 2, notable: 3, major: 4 } as const;
 
@@ -162,6 +162,7 @@ export function StoryCard({
             {primary && <CategoryBadge id={primary} />}
             {categoryText && <Chip>{categoryText}</Chip>}
             {businessEvent && <Chip>{EVENT_LABELS[story.eventType][uiLang]}</Chip>}
+            {view === uiLang && <OriginalLangTag langs={[headlineLang, summaryInfo?.lang]} />}
             {story.rumor && (
               <Chip tone="caution" title={t("card.unconfirmedHint")}>
                 {t("card.unconfirmed")}

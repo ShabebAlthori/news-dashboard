@@ -1,5 +1,5 @@
 import type { SourceHealth, StatusResponse } from "@/lib/shared/types";
-import { pendingAiCount } from "./ai";
+import { pendingAiCount, pendingTitleCount } from "./ai";
 import { aiModelLabel, config } from "./config";
 import { getDb } from "./db";
 import { isRefreshRunning } from "./pipeline";
@@ -86,6 +86,7 @@ export function getStatus(): StatusResponse {
       configured: config.ai.provider !== "none",
       lastError: ai.lastError,
       pending: pendingAiCount(db),
+      pendingTitles: pendingTitleCount(db),
     },
     serverTime: new Date().toISOString(),
   };

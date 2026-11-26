@@ -138,7 +138,10 @@ export interface StatusResponse {
     model: string | null;
     configured: boolean;
     lastError: string | null;
+    /** Stories (in the shown window) still waiting for an AI summary. */
     pending: number;
+    /** Headlines still waiting for a translation. */
+    pendingTitles?: number;
   };
   serverTime: string;
 }

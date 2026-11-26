@@ -13,7 +13,7 @@ import { useNow, useUi } from "./providers";
 import { RadarItemCard } from "./radar-view";
 import { EmptyState, ErrorState, PageHeader } from "./states";
 import { storyHeadline, storySummary } from "./story-text";
-import { CATEGORY_ICONS, categoryTint } from "./story-visuals";
+import { CATEGORY_ICONS, categoryTint, OriginalLangTag } from "./story-visuals";
 
 const LOCALES: Record<Lang, string> = { en: "en-GB", ar: "ar-u-nu-latn" };
 
@@ -131,6 +131,7 @@ function ReportStoryItem({ story, rank }: { story: ReportStory; rank?: number })
           </p>
         )}
         <p className="mt-1.5 text-xs text-subtle">
+          <OriginalLangTag langs={[h.lang, sum?.lang]} className="me-1.5" />
           <span dir="auto">{story.source}</span>
           {story.publishedAt && <> · {formatDateTime(story.publishedAt, lang, now)}</>}
           {story.sourceCount > 1 && <> · {t("card.sources", { n: story.sourceCount })}</>}

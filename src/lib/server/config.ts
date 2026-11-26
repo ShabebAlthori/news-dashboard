@@ -58,8 +58,16 @@ export const config = {
     /** Free-tier friendly spacing between Gemini requests. */
     geminiMinIntervalMs: int("GEMINI_MIN_INTERVAL_MS", 6500, 0, 60000),
     geminiRetryDelayMs: int("GEMINI_RETRY_DELAY_MS", 8000, 0, 60000),
-    maxPerRun: int("AI_MAX_ARTICLES_PER_RUN", 30, 0, 500),
+    /** Stories summarized per run at most. */
+    maxPerRun: int("AI_MAX_ARTICLES_PER_RUN", 40, 0, 500),
+    /** Model requests per run and per UTC day (each request may cover several stories). */
+    maxRequestsPerRun: int("AI_MAX_REQUESTS_PER_RUN", 12, 0, 500),
     dailyLimit: int("AI_DAILY_LIMIT", 200, 0, 10000),
+    /** Headlines per translation request, and stories per summary request. */
+    titleBatch: int("AI_TITLE_BATCH", 25, 1, 60),
+    summaryBatch: int("AI_SUMMARY_BATCH", 4, 1, 10),
+    /** Only stories from this many days are translated and summarized (what the site shows). */
+    windowDays: int("AI_WINDOW_DAYS", 7, 1, 30),
     concurrency: int("AI_CONCURRENCY", 3, 1, 10),
   },
   auth: {

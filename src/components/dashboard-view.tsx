@@ -18,7 +18,7 @@ import { ReportPanel } from "./report-view";
 import { EmptyState, ErrorState, NewStoriesBanner } from "./states";
 import { useUpdateParams } from "./story-feed";
 import { storyHeadline, storySummary } from "./story-text";
-import { BookmarkButton, CategoryBadge, StoryImage, useStoryCategory } from "./story-visuals";
+import { BookmarkButton, CategoryBadge, OriginalLangTag, StoryImage, useStoryCategory } from "./story-visuals";
 import { useHasNewer, useStatus } from "./use-data";
 
 function ViewAll({ href, label }: { href: string; label?: string }) {
@@ -71,6 +71,7 @@ function HeroSlide({ story, active, eager }: { story: Story; active: boolean; ea
           </span>
           <CategoryBadge id={category} />
           {story.breaking && <span className="rounded-full bg-breaking px-2.5 py-0.5 text-xs font-semibold text-white">{t("card.breaking")}</span>}
+          <OriginalLangTag langs={[h.lang, sum?.lang]} tone="onImage" />
           {story.rumor && (
             <span className="rounded-full bg-black/50 px-2.5 py-0.5 text-xs font-semibold text-[#f3b75c]" title={t("card.unconfirmedHint")}>
               {t("card.unconfirmed")}
@@ -238,8 +239,11 @@ function DailyBriefing({ stories, facts }: { stories: Story[]; facts: BriefingFa
                   className="group flex items-start gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-surface-2"
                 >
                   <span className="mt-2 size-2 shrink-0 rounded-full bg-brand ring-4 ring-accent-soft" aria-hidden />
-                  <span lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="line-clamp-2 flex-1 text-[15px] font-medium leading-snug text-fg group-hover:text-accent">
-                    {h.text}
+                  <span className="min-w-0 flex-1">
+                    <span lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="line-clamp-2 text-[15px] font-medium leading-snug text-fg group-hover:text-accent">
+                      {h.text}
+                    </span>
+                    <OriginalLangTag langs={[h.lang]} className="mt-1" />
                   </span>
                   {s.publishedAt && <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-subtle">{formatRelative(s.publishedAt, lang, now)}</span>}
                 </a>

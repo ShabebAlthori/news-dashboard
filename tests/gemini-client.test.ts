@@ -83,8 +83,34 @@ describe("summarizeWithGemini", () => {
     expect(req.body.generationConfig).toHaveProperty("thinkingConfig.thinkingLevel", "LOW");
   });
 
-  it("falls back to the lighter model when the free quota of the main model is used up", async () => {
-    handler = (path) => (path.includes("gemini-3.8-flash") ? { status: 429, json: { error: { code: 429, message: "Quota exceeded", status: "RESOURCE_EXHAUSTED" } } } : ok("gemini-3.5-flash-lite"));
+  const dailyQuota = {
+    status: 429,
+    json: {
+      error: {
+        code: 429,
+        message: "Quota exceeded",
+        status: "RESOURCE_EXHAUSTED",
+        details: [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }],
+      },
+    },
+  };
+  const perMinute = {
+    status: 429,
+    json: {
+      error: {
+        code: 429,
+        message: "Quota exceeded",
+        status: "RESOURCE_EXHAUSTED",
+        details: [
+          { "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" }] },
+          { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "0s" },
+        ],
+      },
+    },
+  };
+
+  it("falls back to the lighter model when the daily free quota of the main model is used up", async () => {
+    handler = (path) => (path.includes("gemini-3.8-flash") ? dailyQuota : ok("gemini-3.5-flash-lite"));
     const { summarizeWithGemini } = await import("@/lib/server/ai/gemini");
     expect((await summarizeWithGemini(article)).model).toBe("gemini-3.5-flash-lite");
     // The exhausted model is skipped for the rest of the day.
@@ -94,6 +120,28 @@ describe("summarizeWithGemini", () => {
       "gemini-3.5-flash-lite:generateContent",
       "gemini-3.5-flash-lite:generateContent",
     ]);
+  });
+
+  it("waits out a per-minute limit and keeps using the main model", async () => {
+    const { summarizeWithGemini, getGeminiState } = await import("@/lib/server/ai/gemini");
+    let calls = 0;
+    handler = () => (++calls === 1 ? perMinute : ok("gemini-3.8-flash"));
+    expect((await summarizeWithGemini(article)).model).toBe("gemini-3.8-flash");
+    expect(seen.map((s) => s.path.split("/").pop())).toEqual(["gemini-3.8-flash:generateContent", "gemini-3.8-flash:generateContent"]);
+    // A per-minute limit does not mark the model as used up for the day.
+    expect(getGeminiState().exhausted).toEqual([]);
+  });
+
+  it("remembers a used-up model across runs (same UTC day)", async () => {
+    const { summarizeWithGemini, getGeminiState, restoreGeminiState, resetGeminiState } = await import("@/lib/server/ai/gemini");
+    handler = (path) => (path.includes("gemini-3.8-flash") ? dailyQuota : ok("gemini-3.5-flash-lite"));
+    await summarizeWithGemini(article);
+    const saved = getGeminiState();
+    resetGeminiState(); // a new process
+    restoreGeminiState(saved);
+    seen.length = 0;
+    await summarizeWithGemini(article);
+    expect(seen.map((s) => s.path.split("/").pop())).toEqual(["gemini-3.5-flash-lite:generateContent"]);
   });
 
   it("retries a temporarily overloaded model once, then uses the lighter model", async () => {
@@ -122,10 +170,13 @@ describe("summarizeWithGemini", () => {
     expect(seen.map((s) => Boolean(s.body.generationConfig.thinkingConfig))).toEqual([true, false]);
   });
 
-  it("maps errors: quota → rate-limit, bad key → auth, unknown model → config, safety → refusal", async () => {
+  it("maps errors: daily quota → rate-limit, per-minute → throttled, bad key → auth, unknown model → config, safety → refusal", async () => {
     const { summarizeWithGemini, resetGeminiState } = await import("@/lib/server/ai/gemini");
-    handler = () => ({ status: 429, json: { error: { message: "Quota exceeded" } } });
+    handler = () => dailyQuota;
     await expect(summarizeWithGemini(article)).rejects.toMatchObject({ kind: "rate-limit" });
+    resetGeminiState();
+    handler = () => perMinute;
+    await expect(summarizeWithGemini(article)).rejects.toMatchObject({ kind: "throttled", stopsRun: false });
     resetGeminiState();
     handler = () => ({ status: 403, json: { error: { message: "API key not valid" } } });
     await expect(summarizeWithGemini(article)).rejects.toMatchObject({ kind: "auth" });

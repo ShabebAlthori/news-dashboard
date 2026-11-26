@@ -17,25 +17,63 @@ function simplify(schema: unknown): unknown {
   return out;
 }
 
-const responseJsonSchema = simplify(z.toJSONSchema(AiOutputSchema));
+const jsonSchemaCache = new WeakMap<z.ZodType, unknown>();
+function responseSchemaFor(schema: z.ZodType): unknown {
+  let s = jsonSchemaCache.get(schema);
+  if (!s) {
+    s = simplify(z.toJSONSchema(schema));
+    jsonSchemaCache.set(schema, s);
+  }
+  return s;
+}
+
+/** A structured request: system prompt, user message and the zod schema the answer must match. */
+export interface JsonRequest<T> {
+  system: string;
+  user: string;
+  schema: z.ZodType<T>;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
+}
 
 interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
   promptFeedback?: { blockReason?: string };
   modelVersion?: string;
-  error?: { code?: number; message?: string; status?: string };
+  error?: { code?: number; message?: string; status?: string; details?: { "@type"?: string; retryDelay?: string; violations?: { quotaId?: string }[] }[] };
 }
 
-// The free tier allows only a few requests per minute: space calls out and, when the main
-// model's quota is used up, continue with the lighter model for the rest of the run.
+// The free tier allows only a few requests per minute and per day. Calls are spaced out;
+// a model whose *daily* quota is used up is skipped until the next UTC day, and a model
+// that keeps answering "busy" rests for a while. This state is saved between runs.
 let lastCallAt = 0;
 let quotaExhausted = new Set<string>();
 let quotaDay = "";
-/** Models that kept answering "busy" (or timing out) are rested for a while. */
 let busyUntil = new Map<string, number>();
 const BUSY_REST_MS = 10 * 60_000;
 /** Set if the API rejects thinkingConfig for a model; then it is sent without it. */
 const noThinkingConfig = new Set<string>();
+
+export interface GeminiState {
+  day: string;
+  exhausted: string[];
+  busyUntil: Record<string, number>;
+}
+
+export function getGeminiState(): GeminiState {
+  return { day: quotaDay, exhausted: [...quotaExhausted], busyUntil: Object.fromEntries(busyUntil) };
+}
+
+export function restoreGeminiState(state: GeminiState | null | undefined) {
+  if (!state) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (state.day === today) {
+    quotaDay = today;
+    quotaExhausted = new Set(state.exhausted);
+  }
+  const now = Date.now();
+  busyUntil = new Map(Object.entries(state.busyUntil ?? {}).filter(([, t]) => t > now));
+}
 
 async function pace() {
   const wait = lastCallAt + config.ai.geminiMinIntervalMs - Date.now();
@@ -55,7 +93,21 @@ function modelsToTry(): string[] {
   );
 }
 
-async function call(model: string, article: PromptArticle): Promise<{ output: AiOutput; model: string }> {
+/**
+ * A 429 is either the per-minute limit (wait and continue) or the per-day quota (skip the
+ * model until tomorrow). Gemini says which in the error details (QuotaFailure.quotaId).
+ */
+export function classify429(error: GeminiResponse["error"]): { daily: boolean; retryAfterMs: number | null } {
+  const details = error?.details ?? [];
+  const ids = details.flatMap((d) => d.violations ?? []).map((v) => v.quotaId ?? "");
+  const text = `${ids.join(" ")} ${error?.message ?? ""}`;
+  const daily = /per ?day|perday|daily/i.test(text);
+  const delay = details.map((d) => d.retryDelay).find(Boolean) ?? text.match(/retry in ([\d.]+)s/i)?.[1];
+  const seconds = delay ? Number.parseFloat(String(delay)) : NaN;
+  return { daily, retryAfterMs: Number.isFinite(seconds) ? Math.min(90_000, Math.ceil(seconds * 1000)) : null };
+}
+
+async function call<T>(model: string, req: JsonRequest<T>): Promise<{ data: T; model: string }> {
   await pace();
   let res: Response;
   try {
@@ -63,17 +115,17 @@ async function call(model: string, article: PromptArticle): Promise<{ output: Ai
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": config.ai.geminiApiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: [{ text: buildUserMessage(article) }] }],
+        systemInstruction: { parts: [{ text: req.system }] },
+        contents: [{ role: "user", parts: [{ text: req.user }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseJsonSchema,
-          maxOutputTokens: 8192,
-          // Summarizing needs little reasoning; low thinking keeps requests fast and light.
+          responseJsonSchema: responseSchemaFor(req.schema),
+          maxOutputTokens: req.maxOutputTokens ?? 8192,
+          // Summarizing and translating need little reasoning; low thinking keeps requests fast.
           ...(noThinkingConfig.has(model) ? {} : { thinkingConfig: { thinkingLevel: "LOW" } }),
         },
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(req.timeoutMs ?? 60_000),
     });
   } catch (err) {
     const timedOut = (err as Error).name === "TimeoutError";
@@ -83,12 +135,16 @@ async function call(model: string, article: PromptArticle): Promise<{ output: Ai
   const body = (await res.json().catch(() => ({}))) as GeminiResponse;
   if (!res.ok) {
     const detail = body.error?.message ? `: ${body.error.message.slice(0, 200)}` : "";
-    if (res.status === 429) throw new AiError("rate-limit", `Gemini quota reached for ${model}${detail}`);
+    if (res.status === 429) {
+      const { daily, retryAfterMs } = classify429(body.error);
+      if (daily) throw new AiError("rate-limit", `Gemini daily quota reached for ${model}${detail}`);
+      throw new AiError("throttled", `Gemini per-minute limit reached for ${model}`, retryAfterMs);
+    }
     if (res.status === 401 || res.status === 403) throw new AiError("auth", `Gemini API key is missing or invalid${detail}`);
     if (res.status === 404) throw new AiError("config", `Gemini model "${model}" is not available${detail}`);
     if (res.status === 400 && /thinking/i.test(body.error?.message ?? "") && !noThinkingConfig.has(model)) {
       noThinkingConfig.add(model);
-      return call(model, article); // this model does not accept thinkingConfig
+      return call(model, req); // this model does not accept thinkingConfig
     }
     if (res.status === 400) throw new AiError("config", `Gemini rejected the request${detail}`);
     throw new AiError("unavailable", `Gemini API error ${res.status}${detail}`);
@@ -111,23 +167,32 @@ async function call(model: string, article: PromptArticle): Promise<{ output: Ai
   } catch {
     throw new AiError("invalid", "Gemini returned invalid JSON");
   }
-  const parsed = AiOutputSchema.safeParse(json);
+  const parsed = req.schema.safeParse(json);
   if (!parsed.success) throw new AiError("invalid", "Gemini output did not match the expected schema");
-  return { output: parsed.data, model: body.modelVersion || model };
+  return { data: parsed.data, model: body.modelVersion || model };
 }
 
-export async function summarizeWithGemini(article: PromptArticle): Promise<{ output: AiOutput; model: string }> {
+/** Run a structured request, falling back across models when one is busy or out of quota. */
+export async function generateWithGemini<T>(req: JsonRequest<T>): Promise<{ data: T; model: string }> {
   if (!config.ai.geminiApiKey) throw new AiError("auth", "GEMINI_API_KEY is not set");
   const models = modelsToTry();
-  if (!models.length) throw new AiError("unavailable", "All Gemini models are busy or out of free quota; will retry on the next update");
+  if (!models.length) throw new AiError("rate-limit", "All Gemini models are busy or out of free quota; will retry on the next update");
   let lastError: AiError | null = null;
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        return await call(model, article);
+        return await call(model, req);
       } catch (err) {
         if (!(err instanceof AiError)) throw err;
         lastError = err;
+        // Per-minute limit: wait as asked (once), then move on to the next model.
+        if (err.kind === "throttled") {
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, err.retryAfterMs ?? config.ai.geminiRetryDelayMs * 4));
+            continue;
+          }
+          break;
+        }
         // Busy ("high demand"), 5xx and timeouts are usually brief: retry once, then rest
         // this model for a while and try the next one.
         if (err.kind === "unavailable") {
@@ -148,6 +213,11 @@ export async function summarizeWithGemini(article: PromptArticle): Promise<{ out
     }
   }
   throw lastError ?? new AiError("rate-limit", "Gemini free-tier quota used up for today");
+}
+
+export async function summarizeWithGemini(article: PromptArticle): Promise<{ output: AiOutput; model: string }> {
+  const { data, model } = await generateWithGemini({ system: SYSTEM_PROMPT, user: buildUserMessage(article), schema: AiOutputSchema });
+  return { output: data, model };
 }
 
 /** For tests. */

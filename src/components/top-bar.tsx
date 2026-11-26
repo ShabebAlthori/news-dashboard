@@ -11,6 +11,7 @@ import { formatRelative } from "@/lib/shared/format";
 import type { StoriesResponse, Story } from "@/lib/shared/types";
 import { useNow, useUi } from "./providers";
 import { storyHeadline } from "./story-text";
+import { OriginalLangTag } from "./story-visuals";
 
 /** Dropdown anchored to its trigger; closes on outside click, Escape and navigation. */
 export function Popover({
@@ -222,6 +223,7 @@ export function Notifications() {
                           {h.text}
                         </span>
                         <span className="mt-0.5 block text-xs text-subtle">
+                          <OriginalLangTag langs={[h.lang]} className="me-1.5" />
                           {s.breaking && <span className="font-semibold text-breaking">{t("card.breaking")} · </span>}
                           <span dir="auto">{s.source.name}</span>
                           {s.publishedAt && <> · {formatRelative(s.publishedAt, lang, now)}</>}

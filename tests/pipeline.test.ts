@@ -55,23 +55,37 @@ const fakeFetch = vi.fn(async (input: string | URL) => {
 });
 vi.stubGlobal("fetch", fakeFetch);
 
-// Mock the Claude call: echo the source faithfully, except invent a number for the delay story.
+// Mock the Claude calls (batched): echo the source faithfully, except invent a number for the delay story.
 vi.mock("../src/lib/server/ai/anthropic", () => ({
-  summarizeWithClaude: vi.fn(async (a: { title: string; text: string }) => {
-    const invented = a.title.includes("Lords of the Fallen");
+  generateWithClaude: vi.fn(async (req: { user: string }) => {
+    if (req.user.startsWith("<headlines>")) {
+      const items = JSON.parse(req.user.replace(/^<headlines>\n/, "").replace(/\n<\/headlines>$/, "")) as { id: string; target: string; headline: string }[];
+      return { model: "mock-model", data: { items: items.map((i) => ({ id: i.id, translation: `[${i.target.toUpperCase()}] ${i.headline}` })) } };
+    }
+    const articles = [...req.user.matchAll(/<article id="([^"]+)">[\s\S]*?<original_headline>([\s\S]*?)<\/original_headline>\n<text>\n([\s\S]*?)\n<\/text>/g)].map((m) => ({
+      id: m[1],
+      title: m[2],
+      text: m[3],
+    }));
     return {
       model: "mock-model",
-      output: {
-        headline_en: a.title,
-        headline_ar: `[AR] ${a.title}`,
-        summary_en: invented ? "The game was delayed by 9 months." : a.text,
-        summary_ar: `[AR] ${a.text}`,
-        significance: a.title.includes("Huang") ? 5 : 3,
-        excluded_topic: a.title.includes("note-taking") ? "deals" : "none",
-        speculative: false,
-        insufficient_text: false,
-        categories: [],
-        companies: [],
+      data: {
+        items: articles.map((a) => {
+          const invented = a.title.includes("Lords of the Fallen");
+          return {
+            id: a.id,
+            headline_en: a.title,
+            headline_ar: `[AR] ${a.title}`,
+            summary_en: invented ? "The game was delayed by 9 months." : a.text,
+            summary_ar: `[AR] ${a.text}`,
+            significance: a.title.includes("Huang") ? 5 : 3,
+            excluded_topic: a.title.includes("note-taking") ? "deals" : "none",
+            speculative: false,
+            insufficient_text: false,
+            categories: [],
+            companies: [],
+          };
+        }),
       },
     };
   }),

@@ -3,6 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { config } from "../config";
 import { AiOutputSchema, buildUserMessage, SYSTEM_PROMPT, type AiOutput, type PromptArticle } from "./prompt";
 import { AiError } from "./errors";
+import type { JsonRequest } from "./gemini";
 
 let client: Anthropic | null = null;
 
@@ -18,6 +19,12 @@ function supportsFallbacks(model: string): boolean {
 }
 
 export async function summarizeWithClaude(article: PromptArticle): Promise<{ output: AiOutput; model: string }> {
+  const { data, model } = await generateWithClaude({ system: SYSTEM_PROMPT, user: buildUserMessage(article), schema: AiOutputSchema });
+  return { output: data, model };
+}
+
+/** Run a structured request (any zod schema) against Claude. */
+export async function generateWithClaude<T>(req: JsonRequest<T>): Promise<{ data: T; model: string }> {
   const model = config.ai.anthropicModel;
   const useFallbacks = config.ai.anthropicFallbacks && supportsFallbacks(model);
   try {
@@ -26,9 +33,9 @@ export async function summarizeWithClaude(article: PromptArticle): Promise<{ out
     const response = await getClient().beta.messages.create({
       model,
       max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserMessage(article) }],
-      output_config: { effort: config.ai.anthropicEffort, format: betaZodOutputFormat(AiOutputSchema) },
+      system: req.system,
+      messages: [{ role: "user", content: req.user }],
+      output_config: { effort: config.ai.anthropicEffort, format: betaZodOutputFormat(req.schema as Parameters<typeof betaZodOutputFormat>[0]) },
       ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
     });
 
@@ -46,9 +53,9 @@ export async function summarizeWithClaude(article: PromptArticle): Promise<{ out
     } catch {
       throw new AiError("invalid", "Response was not valid JSON");
     }
-    const parsed = AiOutputSchema.safeParse(json);
+    const parsed = req.schema.safeParse(json);
     if (!parsed.success) throw new AiError("invalid", "Response did not match the expected schema");
-    return { output: parsed.data, model: response.model };
+    return { data: parsed.data, model: response.model };
   } catch (err) {
     if (err instanceof AiError) throw err;
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {

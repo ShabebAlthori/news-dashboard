@@ -1,6 +1,6 @@
 // The refresh pipeline: fetch → parse → dedupe → classify → cluster → score → summarize.
 import type Database from "better-sqlite3";
-import { enrichStories } from "./ai";
+import { enrichStories, type EnrichResult } from "./ai";
 import { classify } from "./classify";
 import { assignClusters, recomputeCluster, type ClusterCandidate } from "./cluster";
 import { config } from "./config";
@@ -27,6 +27,9 @@ export interface RefreshResult {
   sourcesSkipped: number;
   newArticles: number;
   summarized: number;
+  /** Headlines translated in this run. */
+  translatedTitles?: number;
+  ai?: Omit<EnrichResult, "titles" | "summaries">;
   durationMs: number;
   message?: string;
 }
@@ -388,8 +391,12 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
       console.error("[refresh] radar failed:", err);
     }
     let summarized = 0;
+    let ai: EnrichResult | null = null;
     try {
-      summarized = await enrichStories(db);
+      ai = await enrichStories(db);
+      summarized = ai.summaries;
+      // Logged so the Actions run shows why the translation queue does or does not drain.
+      console.log(`[ai] ${JSON.stringify(ai)}`);
     } catch (err) {
       console.error("[refresh] AI enrichment failed:", err);
     }
@@ -406,7 +413,18 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
       `UPDATE fetch_runs SET finished_at = ?, status = ?, sources_ok = ?, sources_failed = ?, sources_skipped = ?, new_articles = ?, summarized = ?
        WHERE id = ?`,
     ).run(Date.now(), status, ok, failed, skipped, newIds.length, summarized, runId);
-    return { runId, status, sourcesOk: ok, sourcesFailed: failed, sourcesSkipped: skipped, newArticles: newIds.length, summarized, durationMs: Date.now() - started };
+    return {
+      runId,
+      status,
+      sourcesOk: ok,
+      sourcesFailed: failed,
+      sourcesSkipped: skipped,
+      newArticles: newIds.length,
+      summarized,
+      translatedTitles: ai?.titles ?? 0,
+      ...(ai ? { ai: { cached: ai.cached, requests: ai.requests, errors: ai.errors, stoppedBy: ai.stoppedBy, pendingTitles: ai.pendingTitles, pendingSummaries: ai.pendingSummaries } } : {}),
+      durationMs: Date.now() - started,
+    };
   } catch (err) {
     const message = (err as Error).message;
     db.prepare("UPDATE fetch_runs SET finished_at = ?, status = 'failed', error = ? WHERE id = ?").run(Date.now(), message.slice(0, 500), runId);
@@ -419,5 +437,6 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
 
 /** Re-run AI enrichment without fetching (used after configuring a provider). */
 export async function runEnrichmentOnly(): Promise<number> {
-  return enrichStories(getDb());
+  const r = await enrichStories(getDb());
+  return r.titles + r.summaries;
 }

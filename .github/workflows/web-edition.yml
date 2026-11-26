@@ -68,6 +68,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # How often this site is republished; shown in the page and used to flag stale data.
           PUBLISH_INTERVAL_MINUTES: "15"
+          # Used to reuse already-published translations if the news database had to start empty.
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          # AI budget: requests per run (each covers several stories) and per UTC day.
+          AI_MAX_REQUESTS_PER_RUN: ${{ vars.AI_MAX_REQUESTS_PER_RUN || '12' }}
 
       - name: Save news database
         if: success() || failure()

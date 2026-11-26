@@ -231,6 +231,7 @@ export function SettingsView() {
               </p>
               {!status.ai.configured && <p className="text-muted">{t(IS_STATIC ? "settings.aiHowToStatic" : "settings.aiHowTo")}</p>}
               {status.ai.configured && <p className="text-muted">{t("settings.aiPending", { n: status.ai.pending })}</p>}
+              {status.ai.configured && status.ai.pendingTitles != null && <p className="text-muted">{t("settings.aiPendingTitles", { n: status.ai.pendingTitles })}</p>}
               {status.ai.lastError && <p className="text-caution">{t("settings.aiError", { e: status.ai.lastError })}</p>}
               <p className="text-muted">{t("settings.aiAccuracy")}</p>
             </div>

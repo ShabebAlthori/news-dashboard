@@ -6,6 +6,8 @@
 // Usage: npm run export:static [-- <output dir>] [--no-refresh]
 import fs from "node:fs";
 import path from "node:path";
+import { seedCacheFromSnapshot } from "../src/lib/server/ai";
+import { getDb } from "../src/lib/server/db";
 import { runRefresh } from "../src/lib/server/pipeline";
 import { exportSnapshotStories } from "../src/lib/server/queries";
 import { getRadar } from "../src/lib/server/radar";
@@ -18,6 +20,19 @@ async function main() {
   const args = process.argv.slice(2);
   const outDir = path.resolve(args.find((a) => !a.startsWith("--")) ?? "out/data");
   const days = Math.min(30, Math.max(1, Number(process.env.SNAPSHOT_DAYS ?? 7)));
+
+  // A fresh database (e.g. the Actions cache expired): reuse the translations and summaries
+  // already published, so they are not requested from the AI provider again.
+  const db = getDb();
+  const articles = (db.prepare("SELECT COUNT(*) AS n FROM articles").get() as { n: number }).n;
+  if (articles === 0 && process.env.PAGES_URL) {
+    try {
+      const res = await fetch(`${process.env.PAGES_URL.replace(/\/$/, "")}/data/snapshot.json`, { signal: AbortSignal.timeout(30_000) });
+      if (res.ok) console.log(`Seeded ${seedCacheFromSnapshot(db, ((await res.json()) as Snapshot).stories)} cached translations from the published snapshot`);
+    } catch (err) {
+      console.warn("Could not seed the translation cache:", (err as Error).message);
+    }
+  }
 
   if (!args.includes("--no-refresh")) {
     const result = await runRefresh("cron");
