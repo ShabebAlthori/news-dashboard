@@ -16,6 +16,11 @@ export interface RankContext {
   read: Set<string>;
   now: number;
   generatedAt: string;
+  /**
+   * The moment the data describes (the snapshot's generation time). Dashboard windows such as
+   * "last 24 hours" are measured from here, so counts do not shrink as a snapshot ages.
+   */
+  asOf?: number;
 }
 
 export interface StaticQuery {
@@ -167,7 +172,7 @@ export interface DashboardOptions {
 
 export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, opts: DashboardOptions = {}): DashboardResponse {
   const ctx = withNormalizedPrefs(rawCtx);
-  const now = ctx.now;
+  const now = Math.min(ctx.asOf ?? ctx.now, ctx.now);
   const category = opts.category && opts.category !== "all" && FILTER_IDS.includes(opts.category) ? opts.category : null;
   const scope: StaticQuery = category ? { category } : {};
   const shown = new Set<number>();

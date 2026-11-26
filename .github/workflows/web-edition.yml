@@ -1,12 +1,17 @@
 # Publishes the web edition to GitHub Pages and keeps it up to date.
 # Every run: fetch all feeds → cluster, score and (optionally) summarize → build static site → deploy.
 # The news database is carried between runs with the Actions cache.
+#
+# Keeping a 15-minute cadence: GitHub treats `schedule` as best effort and drops many runs
+# under load (in practice only a few per day ran). So each run also queues the next one with
+# workflow_dispatch (see the `chain` job). The cron below is only a backstop that restarts the
+# chain if it ever stops. Set the repository variable AUTO_REFRESH_CHAIN to "off" to disable it.
 name: Web edition
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # refresh news (GitHub may start scheduled runs a few minutes late)
-    - cron: "41 3 * * *" # daily: also keep the schedule active (see keepalive job)
+    # Off-peak minutes: GitHub is busiest (and drops most scheduled runs) at :00/:15/:30/:45.
+    - cron: "7,22,37,52 * * * *"
   push:
     branches: [main]
   workflow_dispatch:
@@ -61,6 +66,8 @@ jobs:
           AI_DAILY_LIMIT: ${{ vars.AI_DAILY_LIMIT || '200' }}
           # Data Radar: notable new data repositories via the GitHub search API (read-only use).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # How often this site is republished; shown in the page and used to flag stale data.
+          PUBLISH_INTERVAL_MINUTES: "15"
 
       - name: Save news database
         if: success() || failure()
@@ -86,10 +93,43 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v5
 
-  # GitHub pauses scheduled workflows in public repositories after 60 days without
-  # activity. Once a day, if the last commit is older than 50 days, add an empty commit.
+  # Queue the next update ~15 minutes after this run started, unless a run is already
+  # waiting or running. workflow_dispatch is one of the two events GITHUB_TOKEN may trigger.
+  # Runs even when the build failed, so one bad run does not stop the updates.
+  chain:
+    needs: deploy
+    if: ${{ always() && !cancelled() && !github.event.repository.private && vars.AUTO_REFRESH_CHAIN != 'off' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Wait until the next update is due
+        run: |
+          started=$(gh api "repos/$GH_REPO/actions/runs/${{ github.run_id }}" --jq .run_started_at)
+          due=$(( $(date -d "$started" +%s) + 14 * 60 ))
+          wait=$(( due - $(date +%s) ))
+          echo "Run started $started; next update due in ${wait}s"
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+      - name: Queue the next update
+        run: |
+          others=$(gh run list --workflow web-edition.yml --limit 20 --json databaseId,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select(.status != \"completed\")] | length")
+          if [ "$others" -gt 0 ]; then
+            echo "Another run is already queued or running ($others); not queuing a duplicate."
+          else
+            gh workflow run web-edition.yml --ref "${{ github.ref_name }}"
+            echo "Next update queued."
+          fi
+
+  # GitHub disables scheduled workflows in public repositories after 60 days without
+  # activity. If the last commit is older than 50 days, add an empty commit (cheap check,
+  # done on every scheduled or chained run because a single daily cron is often dropped).
   keepalive:
-    if: ${{ !github.event.repository.private && github.event_name == 'schedule' && github.event.schedule == '41 3 * * *' }}
+    if: ${{ !github.event.repository.private && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

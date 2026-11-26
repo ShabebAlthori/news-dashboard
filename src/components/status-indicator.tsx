@@ -1,11 +1,12 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { Clock, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { mutate } from "swr";
 import { formatDateTime, formatRelative } from "@/lib/shared/format";
 import { requestRefresh } from "@/lib/client/actions";
 import { IS_STATIC } from "@/lib/client/mode";
+import { dataFreshness, formatAge, type Freshness } from "@/lib/shared/freshness";
 import { useNow, useUi } from "./providers";
 import { useStatus } from "./use-data";
 
@@ -24,7 +25,7 @@ export function useRefresh() {
       if (outcome === "checked") {
         // Web edition: feeds refresh on a schedule; reload whatever was published since.
         await mutate((key) => typeof key === "string" && key.startsWith("/api/"), undefined, { revalidate: true });
-        setNote(t("status.staticNote"));
+        setNote(t("status.staticNote", { n: data?.intervalMinutes ?? 15 }));
         return;
       }
       setNote(outcome === "too-soon" ? t("status.tooSoon") : t("status.started"));
@@ -46,13 +47,44 @@ export function useRefresh() {
   return { refresh, running: !!data?.running || busy, note, status: data };
 }
 
+/** green: under 2× the update interval · amber: 2×–6× (or failing sources) · red: older. */
+export function freshnessDot(fresh: Freshness, failing = 0): string {
+  if (fresh.level === "stale") return "bg-breaking";
+  if (fresh.level === "aging") return "bg-caution";
+  if (fresh.level === "unknown") return "bg-subtle";
+  return failing > 0 ? "bg-caution" : "bg-ok";
+}
+
+/** Visible notice when the data is older than it should be (amber and red states). */
+export function StaleNotice() {
+  const { t, lang } = useUi();
+  const now = useNow(60_000);
+  const { data } = useStatus();
+  const fresh = dataFreshness(data?.lastSuccessAt, data?.intervalMinutes, now);
+  if (!data || fresh.ageMs == null || (fresh.level !== "aging" && fresh.level !== "stale")) return null;
+  const red = fresh.level === "stale";
+  return (
+    <div
+      role="status"
+      className={`mb-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${red ? "border-breaking/40 bg-breaking-soft text-fg" : "border-caution/40 bg-caution-soft text-fg"}`}
+    >
+      <Clock className={`mt-0.5 size-4 shrink-0 ${red ? "text-breaking" : "text-caution"}`} aria-hidden />
+      <p>
+        <strong className={red ? "text-breaking" : "text-caution"}>{t("stale.title", { age: formatAge(fresh.ageMs, lang) })}</strong>{" "}
+        <span className="text-muted">{IS_STATIC ? t("stale.hintStatic") : t("stale.hintServer")}</span>
+      </p>
+    </div>
+  );
+}
+
 /** Sidebar card: last successful update, source health and a manual refresh button. */
 export function StatusCard({ rail = false }: { rail?: boolean }) {
   const { t, lang } = useUi();
   const now = useNow(30_000);
   const { refresh, running, note, status } = useRefresh();
   const failing = status?.sources.failing ?? 0;
-  const dot = !status ? "bg-subtle" : running ? "bg-accent animate-pulse" : failing > 0 ? "bg-caution" : status.lastSuccessAt ? "bg-ok" : "bg-subtle";
+  const fresh = dataFreshness(status?.lastSuccessAt, status?.intervalMinutes, now);
+  const dot = !status ? "bg-subtle" : running ? "bg-accent animate-pulse" : freshnessDot(fresh, failing);
   const relative = status?.lastSuccessAt ? formatRelative(status.lastSuccessAt, lang, now) : null;
   const exact = status?.lastSuccessAt ? t("status.lastUpdateAt", { time: formatDateTime(status.lastSuccessAt, lang, now) }) : t("status.never");
   const label = IS_STATIC ? t("status.checkUpdates") : t("status.refreshNow");
@@ -92,6 +124,11 @@ export function StatusCard({ rail = false }: { rail?: boolean }) {
         </div>
         {button}
       </div>
+      {!running && fresh.ageMs != null && (fresh.level === "aging" || fresh.level === "stale") && (
+        <p className={`mt-2 text-[13px] font-medium leading-5 ${fresh.level === "stale" ? "text-breaking" : "text-caution"}`}>
+          {t("stale.short", { age: formatAge(fresh.ageMs, lang) })}
+        </p>
+      )}
       {failing > 0 && !running && <p className="mt-2 text-xs leading-5 text-caution">{t("status.failing", { n: failing })}</p>}
       {note && <p className="mt-2 text-xs leading-5 text-muted">{note}</p>}
     </div>

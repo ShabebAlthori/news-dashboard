@@ -8,7 +8,7 @@ import type { I18nKey } from "@/lib/shared/i18n";
 import { Brand, TechPulseMark } from "./brand";
 import { LanguageToggle, ThemeSwitch } from "./controls";
 import { useUi } from "./providers";
-import { StatusCard } from "./status-indicator";
+import { StaleNotice, StatusCard } from "./status-indicator";
 import { Notifications, ProfileMenu, SearchBox } from "./top-bar";
 
 const NAV: { href: string; key: I18nKey; icon: typeof House }[] = [
@@ -215,6 +215,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main id="content" className="mx-auto w-full max-w-[1480px] flex-1 px-4 pb-28 pt-4 sm:px-6 md:pb-12 md:pt-6 lg:px-8">
+          <StaleNotice />
           {children}
         </main>
 

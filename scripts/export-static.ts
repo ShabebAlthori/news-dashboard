@@ -26,7 +26,10 @@ async function main() {
 
   // Normally done by the refresh; also covers --no-refresh exports of an existing database.
   maybeGenerateWeeklyReport();
-  const status = { ...getStatus(), running: false, nextRunAt: null };
+  // The page flags data as stale relative to how often this site is actually republished
+  // (the workflow's cadence), not the self-hosted scheduler's preference.
+  const publishMinutes = Math.min(1440, Math.max(5, Number(process.env.PUBLISH_INTERVAL_MINUTES ?? 15) || 15));
+  const status = { ...getStatus(), running: false, nextRunAt: null, intervalMinutes: publishMinutes };
   const sources = getSourcesHealth();
   const stories = exportSnapshotStories(days);
   // Written after the refresh finished, so the page never thinks a newer update exists.

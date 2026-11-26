@@ -108,7 +108,7 @@ async function context(): Promise<{ snap: Snapshot; ctx: RankContext }> {
   const snap = await getSnapshot();
   return {
     snap,
-    ctx: { prefs: getPrefs(snap.defaultPrefs), saved: savedMap(), read: readSet(), now: Date.now(), generatedAt: snap.generatedAt },
+    ctx: { prefs: getPrefs(snap.defaultPrefs), saved: savedMap(), read: readSet(), now: Date.now(), generatedAt: snap.generatedAt, asOf: Date.parse(snap.generatedAt) },
   };
 }
 
@@ -122,7 +122,8 @@ export async function staticFetch<T>(key: string): Promise<T> {
     case "/api/status": {
       const file = await loadStatusFile();
       const last = file.status.lastSuccessAt ? new Date(file.status.lastSuccessAt).getTime() : null;
-      return { ...file.status, running: false, nextRunAt: last ? new Date(last + 15 * 60_000).toISOString() : null } as T;
+      const interval = file.status.intervalMinutes || 15;
+      return { ...file.status, running: false, nextRunAt: last ? new Date(last + interval * 60_000).toISOString() : null } as T;
     }
     case "/api/sources":
       return (await loadStatusFile()).sources as T;

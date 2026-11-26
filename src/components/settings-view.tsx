@@ -111,7 +111,7 @@ export function SettingsView() {
           {prefs && (
             <div className="space-y-4">
               {IS_STATIC ? (
-                <p className="text-sm text-muted">{t("settings.staticUpdates")}</p>
+                <p className="text-sm text-muted">{t("settings.staticUpdates", { n: status?.intervalMinutes ?? 15 })}</p>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="font-medium text-fg">{t("settings.interval")}</span>
@@ -127,7 +127,15 @@ export function SettingsView() {
                 <dt className="text-muted">{t("settings.lastUpdate")}</dt>
                 <dd className="text-fg">{status?.lastSuccessAt ? formatDateTime(status.lastSuccessAt, lang, now) : "—"}</dd>
                 <dt className="text-muted">{t("settings.nextUpdate")}</dt>
-                <dd className="text-fg">{status?.nextRunAt ? formatDateTime(status.nextRunAt, lang, now) : "—"}</dd>
+                <dd className="text-fg">
+                  {!status?.nextRunAt ? (
+                    "—"
+                  ) : Date.parse(status.nextRunAt) < now ? (
+                    <span className="font-medium text-caution">{t("status.overdue", { time: formatDateTime(status.nextRunAt, lang, now) })}</span>
+                  ) : (
+                    formatDateTime(status.nextRunAt, lang, now)
+                  )}
+                </dd>
               </dl>
               <StatusCard />
             </div>
