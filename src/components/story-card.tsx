@@ -20,13 +20,13 @@ export function ImportanceMeter({ story }: { story: Story }) {
   const { t } = useUi();
   const filled = TIER_BARS[story.tier];
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted" title={`${t("importance.label")}: ${story.importance}/100`}>
+    <span className="inline-flex items-center gap-1.5 text-xs text-subtle" title={`${t("importance.label")}: ${story.importance}/100`}>
       <span className="inline-flex items-end gap-0.5" aria-hidden>
         {[1, 2, 3, 4].map((i) => (
-          <span key={i} className={`w-1 rounded-sm ${i <= filled ? "bg-accent" : "bg-line-strong"}`} style={{ height: 4 + i * 3 }} />
+          <span key={i} className={`w-[3px] rounded-sm ${i <= filled ? "bg-accent" : "bg-line-strong"}`} style={{ height: 3 + i * 2.5 }} />
         ))}
       </span>
-      <span className={story.tier === "major" ? "font-semibold text-accent-strong" : ""}>
+      <span className={story.tier === "major" ? "font-medium text-accent" : ""}>
         <span className="sr-only">{t("importance.label")}: </span>
         {t(`importance.${story.tier}`)}
       </span>
@@ -36,13 +36,13 @@ export function ImportanceMeter({ story }: { story: Story }) {
 
 function Chip({ children, tone = "neutral", title }: { children: React.ReactNode; tone?: "neutral" | "breaking" | "caution" | "ok"; title?: string }) {
   const tones = {
-    neutral: "bg-surface-2 text-muted",
-    breaking: "bg-breaking-soft text-breaking font-semibold",
-    caution: "bg-caution-soft text-caution",
-    ok: "bg-ok-soft text-ok",
+    neutral: "text-subtle",
+    breaking: "text-breaking font-semibold",
+    caution: "text-caution font-medium",
+    ok: "text-ok",
   };
   return (
-    <span title={title} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}>
+    <span title={title} className={`inline-flex items-center gap-1 text-xs ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -138,22 +138,26 @@ export function StoryCard({
   }
 
   const headingClass =
-    variant === "lead" ? "text-xl sm:text-2xl font-bold leading-snug" : variant === "compact" ? "text-[15px] font-semibold leading-snug" : "text-lg font-semibold leading-snug";
+    variant === "lead"
+      ? "text-[22px] sm:text-[26px] font-semibold leading-[1.2] tracking-[-0.02em]"
+      : variant === "compact"
+        ? "text-[15px] font-semibold leading-snug"
+        : "text-[18px] sm:text-[19px] font-semibold leading-snug";
 
   return (
-    <article className={`card card-hover group ${variant === "compact" ? "p-3.5" : "p-4 sm:p-5"} ${story.read ? "opacity-[0.92]" : ""}`}>
+    <article className={`group ${variant === "compact" ? "py-4" : "py-6"} first:pt-0 ${story.read ? "opacity-[0.92]" : ""}`}>
       <div
         className={
           imageShown
             ? variant === "lead"
-              ? "grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]"
-              : "grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]"
+              ? "grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]"
+              : "grid grid-cols-1 gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,200px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,240px)]"
             : ""
         }
       >
         <div className="min-w-0">
           {/* Labels */}
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             {story.breaking && (
               <Chip tone="breaking" title={t("card.breakingHint")}>
                 {t("card.breaking")}
@@ -181,7 +185,7 @@ export function StoryCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => markRead(story.leadArticleId, story.url)}
-                className="decoration-accent/60 decoration-2 underline-offset-4 hover:underline"
+                className="headline-link"
               >
                 {headline}
               </a>
@@ -203,7 +207,7 @@ export function StoryCard({
                 <p
                   lang={summaryLang}
                   dir={summaryLang === "ar" ? "rtl" : "ltr"}
-                  className={`text-[15px] text-fg/90 ${summaryLang === "ar" ? "leading-8" : "leading-relaxed"} ${variant === "default" ? "line-clamp-5" : ""}`}
+                  className={`max-w-[70ch] text-[15px] text-muted ${summaryLang === "ar" ? "leading-8" : "leading-relaxed"} ${variant === "default" ? "line-clamp-4" : ""}`}
                 >
                   {summary}
                 </p>
@@ -216,7 +220,7 @@ export function StoryCard({
 
           {/* Meta */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
-            <span className="inline-flex items-center gap-1.5 font-medium text-fg">
+            <span className="inline-flex items-center gap-1.5 font-medium text-fg/90">
               <SourceLogo source={story.source} />
               <span dir="auto" className="bidi-isolate">
                 {story.source.name}
@@ -237,14 +241,18 @@ export function StoryCard({
           </div>
 
           {story.companies.length > 0 && variant !== "compact" && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {story.companies.slice(0, 4).map((id) => {
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-1 text-xs text-subtle">
+              {story.companies.slice(0, 4).map((id, i) => {
                 const c = companyById(id);
                 if (!c) return null;
                 return (
-                  <Link key={id} href={`/companies?co=${id}`} className="rounded-full border border-line px-2 py-0.5 text-xs text-muted transition-colors hover:border-accent hover:text-accent">
-                    {c[uiLang]}
-                  </Link>
+                  <span key={id} className="inline-flex items-center">
+                    {i > 0 && <span aria-hidden className="me-1">·</span>}
+                    {/* Small text link with a 44px hit area around it. */}
+                    <Link href={`/companies?co=${id}`} className="relative inline-flex min-h-8 items-center text-muted transition-colors after:absolute after:-inset-x-2.5 after:-inset-y-1.5 after:content-[''] hover:text-accent">
+                      {c[uiLang]}
+                    </Link>
+                  </span>
                 );
               })}
             </div>
@@ -257,7 +265,7 @@ export function StoryCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => markRead(story.leadArticleId, story.url)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg transition-colors hover:bg-surface-2"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line px-3 text-xs font-medium text-fg transition-colors hover:bg-surface-2 sm:min-h-9"
             >
               <ExternalLink className="size-3.5 rtl:-scale-x-100" aria-hidden />
               {t("card.readAt", { source: story.source.name })}
@@ -266,7 +274,7 @@ export function StoryCard({
               type="button"
               onClick={toggleSave}
               aria-pressed={saved}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-surface-2 ${saved ? "border-accent text-accent" : "border-line text-fg"}`}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors hover:bg-surface-2 sm:min-h-9 ${saved ? "border-accent/50 text-accent" : "border-line text-fg"}`}
             >
               {saved ? <BookmarkCheck className="size-3.5" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
               {saved ? t("card.saved") : t("card.save")}
@@ -276,7 +284,7 @@ export function StoryCard({
                 type="button"
                 onClick={() => setOverride({ ui: uiLang, view: otherLang })}
                 title={t("card.otherLangHint")}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg transition-colors hover:bg-surface-2"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line px-3 text-xs font-medium text-fg transition-colors hover:bg-surface-2 sm:min-h-9"
               >
                 <Languages className="size-3.5" aria-hidden />
                 <span lang={otherLang}>{otherLang === "ar" ? "العربية" : "English"}</span>
@@ -286,10 +294,10 @@ export function StoryCard({
 
           {/* Details: other coverage + ranking explanation */}
           {variant !== "compact" && (
-            <div className="mt-3 space-y-2 border-t border-line pt-2.5">
+            <div className="mt-3 space-y-2">
               {story.coverage.length > 0 && (
                 <details className="group/cov">
-                  <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-accent [&::-webkit-details-marker]:hidden">
+                  <summary className="flex min-h-8 cursor-pointer list-none items-center gap-1 text-xs font-medium text-accent [&::-webkit-details-marker]:hidden">
                     <ChevronDown className="size-3.5 transition-transform group-open/cov:rotate-180" aria-hidden />
                     {t("card.otherCoverage", { n: story.coverage.length })}
                   </summary>
@@ -310,7 +318,7 @@ export function StoryCard({
                           onClick={() => markRead(c.articleId, c.url)}
                           lang={c.lang ?? "en"}
                           dir={c.lang === "ar" ? "rtl" : "ltr"}
-                          className="mt-0.5 block text-muted hover:text-accent hover:underline"
+                          className="headline-link mt-0.5 block text-muted hover:text-accent"
                         >
                           {c.title}
                         </a>
@@ -320,7 +328,7 @@ export function StoryCard({
                 </details>
               )}
               <details className="group/why">
-                <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-8 cursor-pointer list-none items-center gap-1 text-xs text-subtle [&::-webkit-details-marker]:hidden">
                   <ChevronDown className="size-3.5 transition-transform group-open/why:rotate-180" aria-hidden />
                   {t("card.why")}
                 </summary>
@@ -349,7 +357,7 @@ export function StoryCard({
             tabIndex={-1}
             aria-hidden
             onClick={() => markRead(story.leadArticleId, story.url)}
-            className={`order-first block overflow-hidden rounded-xl bg-surface-2 ${variant === "lead" ? "md:order-none" : "sm:order-none sm:self-start"}`}
+            className={`order-first block overflow-hidden rounded-lg bg-surface-2 ${variant === "lead" ? "md:order-none" : "sm:order-none sm:self-start"}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- publisher-hosted thumbnails from many domains */}
             <img
@@ -360,8 +368,8 @@ export function StoryCard({
               onError={() => setFailedImage(story.imageUrl)}
               className={
                 variant === "lead"
-                  ? "aspect-[16/9] max-h-48 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] sm:max-h-64 md:aspect-[16/10] md:size-full md:max-h-none"
-                  : "aspect-[16/9] max-h-44 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] sm:aspect-[16/11] sm:max-h-none"
+                  ? "zoom-img aspect-[16/9] max-h-48 w-full object-cover sm:max-h-64 md:aspect-[16/10] md:size-full md:max-h-none"
+                  : "zoom-img aspect-[16/9] max-h-44 w-full object-cover sm:aspect-[4/3] sm:max-h-none"
               }
             />
           </a>

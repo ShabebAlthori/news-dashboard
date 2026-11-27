@@ -18,7 +18,7 @@ import { useStatus } from "./use-data";
 function Card({ title, hint, children, id }: { title: string; hint?: string; children: ReactNode; id?: string }) {
   return (
     <section id={id} className="card scroll-mt-24 p-5">
-      <h2 className="text-base font-bold text-fg">{title}</h2>
+      <h2 className="text-base font-semibold text-fg">{title}</h2>
       {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
       <div className="mt-4">{children}</div>
     </section>
@@ -31,7 +31,7 @@ function ToggleChip({ active, onClick, children }: { active: boolean; onClick: (
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${active ? "border-accent bg-accent-soft font-medium text-accent-strong" : "border-line text-muted hover:border-line-strong hover:text-fg"}`}
+      className={`inline-flex min-h-10 items-center rounded-lg border px-3 text-sm transition-colors ${active ? "border-line-strong bg-surface-2 font-medium text-fg" : "border-line text-muted hover:border-line-strong hover:text-fg"}`}
     >
       {children}
     </button>
@@ -146,7 +146,7 @@ export function SettingsView() {
         <Card id="categories" title={t("settings.categories")} hint={t("settings.categoriesHint")}>
           {prefs && (
             <>
-              <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface-2/40">
+              <ol className="divide-y divide-line overflow-hidden rounded-lg border border-line">
                 {prefs.categoryOrder.map((id, i) => {
                   const label = categoryLabel(id);
                   const enabled = prefs.interests.includes(id);
@@ -182,9 +182,9 @@ export function SettingsView() {
                         aria-checked={enabled}
                         aria-label={label?.[lang] ?? id}
                         onClick={() => save({ interests: toggleIn(prefs.interests, id) })}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors after:absolute after:-inset-2.5 after:content-[''] ${enabled ? "border-transparent brand-gradient" : "border-line-strong bg-surface-2"}`}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors after:absolute after:-inset-2.5 after:content-[''] ${enabled ? "border-transparent bg-brand" : "border-line-strong bg-surface-2"}`}
                       >
-                        <span className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"}`} />
+                        <span className={`inline-block size-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"}`} />
                       </button>
                     </li>
                   );

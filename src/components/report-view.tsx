@@ -59,10 +59,14 @@ function ReportStoryItem({ story, rank }: { story: ReportStory; rank?: number })
   const h = storyHeadline(story, lang);
   const sum = storySummary(story, lang);
   return (
-    <li className="flex gap-3.5 py-3.5 first:pt-0 last:pb-0">
-      {rank != null && <span className="mt-0.5 w-6 shrink-0 text-center text-lg font-bold tabular-nums text-accent">{rank}</span>}
+    <li className="flex gap-4 py-4 first:pt-0 last:pb-0">
+      {rank != null && (
+        <span className="w-6 shrink-0 pt-0.5 font-mono text-[13px] tabular-nums text-subtle" aria-hidden>
+          {String(rank).padStart(2, "0")}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
-        <a href={story.url} target="_blank" rel="noopener noreferrer" lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="block font-semibold leading-snug text-fg hover:text-accent">
+        <a href={story.url} target="_blank" rel="noopener noreferrer" lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="headline-link block text-[16px] font-semibold leading-snug text-fg">
           {h.text}
         </a>
         {sum && (
@@ -79,7 +83,7 @@ function ReportStoryItem({ story, rank }: { story: ReportStory; rank?: number })
       </div>
       {story.imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- publisher-hosted images
-        <img src={story.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="hidden h-20 w-32 shrink-0 rounded-xl object-cover sm:block" />
+        <img src={story.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="hidden aspect-[4/3] w-28 shrink-0 self-start rounded-lg object-cover sm:block" />
       )}
     </li>
   );
@@ -89,20 +93,20 @@ function ReportBody({ report }: { report: WeeklyReport }) {
   const { t, lang } = useUi();
   const now = useNow();
   return (
-    <div className="space-y-6">
-      <div className="card brand-gradient-soft p-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent">{t("report.coverage")}</p>
-        <p className="mt-1 text-xl font-bold text-fg">{formatPeriod(report.periodStart, report.periodEnd, lang)}</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-          <span className="rounded-full border border-line bg-surface px-3 py-1 text-fg">{t("report.stories", { n: report.totals.stories })}</span>
-          <span className="rounded-full border border-line bg-surface px-3 py-1 text-fg">{t("report.sources", { n: report.totals.sources })}</span>
-          <span className="rounded-full border border-line bg-surface px-3 py-1 text-muted">{t("report.generated", { time: formatRelative(report.generatedAt, lang, now) })}</span>
-        </div>
-        <p className="mt-3 text-sm leading-relaxed text-muted">{t("report.method")}</p>
+    <div className="space-y-14">
+      <div>
+        <p className="eyebrow">{t("report.coverage")}</p>
+        <p className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-fg sm:text-[28px]">{formatPeriod(report.periodStart, report.periodEnd, lang)}</p>
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-subtle">
+          <span>{t("report.stories", { n: report.totals.stories })}</span>
+          <span>{t("report.sources", { n: report.totals.sources })}</span>
+          <span>{t("report.generated", { time: formatRelative(report.generatedAt, lang, now) })}</span>
+        </p>
+        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted">{t("report.method")}</p>
       </div>
 
-      <section className="card p-5">
-        <h2 className="mb-4 text-lg font-bold text-fg">{t("report.highlights")}</h2>
+      <section className="border-t border-line pt-5">
+        <h2 className="mb-5 text-xl font-semibold text-fg">{t("report.highlights")}</h2>
         <ol className="divide-y divide-line">
           {report.highlights.map((s, i) => (
             <ReportStoryItem key={s.id} story={s} rank={i + 1} />
@@ -110,20 +114,16 @@ function ReportBody({ report }: { report: WeeklyReport }) {
         </ol>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-x-12 gap-y-12 lg:grid-cols-2">
         {report.sections.map((sec) => {
           const label = shortCategoryLabel(sec.id);
           const Icon = CATEGORY_ICONS[sec.id];
           return (
-            <section key={sec.id} className="card p-5">
-              <div className="mb-3 flex items-center gap-2.5">
-                {Icon && (
-                  <span className="inline-flex size-8 items-center justify-center rounded-lg border border-line bg-surface-2" style={{ color: categoryTint(sec.id).mark }}>
-                    <Icon className="size-4" aria-hidden />
-                  </span>
-                )}
-                <h2 className="font-bold text-fg">{label?.[lang] ?? sec.id}</h2>
-                <span className="ms-auto text-xs text-subtle">{t("report.stories", { n: sec.count })}</span>
+            <section key={sec.id} className="border-t border-line pt-4">
+              <div className="mb-4 flex items-center gap-2.5">
+                {Icon && <Icon className="size-4 shrink-0" style={{ color: categoryTint(sec.id).mark }} aria-hidden />}
+                <h2 className="font-semibold text-fg">{label?.[lang] ?? sec.id}</h2>
+                <span className="ms-auto font-mono text-xs text-subtle">{t("report.stories", { n: sec.count })}</span>
               </div>
               {sec.stories.length ? (
                 <ul className="divide-y divide-line">
@@ -140,19 +140,19 @@ function ReportBody({ report }: { report: WeeklyReport }) {
       </div>
 
       {report.companies.length > 0 && (
-        <section className="card p-5">
-          <h2 className="mb-4 text-lg font-bold text-fg">{t("report.companies")}</h2>
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <section className="border-t border-line pt-5">
+          <h2 className="mb-5 text-xl font-semibold text-fg">{t("report.companies")}</h2>
+          <ul className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
             {report.companies.map((c) => {
               const company = companyById(c.id);
               const h = c.top ? storyHeadline(c.top, lang) : null;
               return (
-                <li key={c.id} className="flex gap-3 rounded-xl border border-line bg-surface-2/50 p-3">
-                  <CompanyLogo id={c.id} size={36} />
+                <li key={c.id} className="flex gap-3">
+                  <CompanyLogo id={c.id} size={32} />
                   <div className="min-w-0">
                     <p className="flex items-baseline gap-2">
-                      <span className="font-semibold text-fg">{company?.[lang] ?? c.id}</span>
-                      <span className="text-xs text-subtle">{t("report.stories", { n: c.count })}</span>
+                      <span className="font-medium text-fg">{company?.[lang] ?? c.id}</span>
+                      <span className="font-mono text-xs text-subtle">{t("report.stories", { n: c.count })}</span>
                     </p>
                     {c.top && h && (
                       <a href={c.top.url} target="_blank" rel="noopener noreferrer" lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className="mt-0.5 line-clamp-2 text-sm text-muted hover:text-fg">
@@ -185,12 +185,13 @@ export function ReportView() {
   return (
     <>
       <PageHeader
+        eyebrow={t("report.eyebrow")}
         title={t("report.title")}
         subtitle={t("report.desc")}
         actions={
           data ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-muted">
-              <CalendarDays className="size-4 text-accent" aria-hidden />
+            <span className="inline-flex items-center gap-2 text-sm text-muted">
+              <CalendarDays className="size-4 text-subtle" aria-hidden />
               {t("report.every")} · {t("report.next", { date: formatDay(data.nextAt, lang) })}
             </span>
           ) : undefined
@@ -200,8 +201,8 @@ export function ReportView() {
         <ErrorState onRetry={() => mutate()} />
       ) : !data ? (
         <div className="space-y-4">
-          <div className="skeleton h-40 rounded-2xl" />
-          <div className="skeleton h-80 rounded-2xl" />
+          <div className="skeleton h-24 rounded-lg" />
+          <div className="skeleton h-80 rounded-lg" />
         </div>
       ) : !data.latest ? (
         <EmptyState title={id ? t("report.notFound") : t("report.none")} hint={t("report.next", { date: formatDay(data.nextAt, lang) })} />
@@ -209,8 +210,8 @@ export function ReportView() {
         <>
           <ReportBody report={data.latest} />
           {data.archive.length > 1 && (
-            <section className="mt-8">
-              <h2 className="mb-3 text-lg font-bold text-fg">{t("report.archive")}</h2>
+            <section className="mt-14 border-t border-line pt-5">
+              <h2 className="mb-4 text-xl font-semibold text-fg">{t("report.archive")}</h2>
               <ul className="flex flex-wrap gap-2">
                 {data.archive.map((r, i) => {
                   const current = r.id === data.latest!.id;
@@ -219,7 +220,7 @@ export function ReportView() {
                       <Link
                         href={i === 0 ? "/report" : `/report?id=${r.id}`}
                         aria-current={current ? "page" : undefined}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm ${current ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line bg-surface text-fg hover:bg-surface-2"}`}
+                        className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3.5 text-sm ${current ? "border-line-strong bg-surface-2 font-medium text-fg" : "border-line text-muted hover:text-fg"}`}
                       >
                         <FileText className="size-4" aria-hidden />
                         {formatPeriod(r.periodStart, r.periodEnd, lang)}

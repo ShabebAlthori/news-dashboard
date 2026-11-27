@@ -57,7 +57,7 @@ export function SearchView() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={t("search.placeholder")}
-          className="h-12 w-full rounded-xl border border-line bg-surface pe-4 ps-11 text-base text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
+          className="h-12 w-full rounded-lg border border-line bg-surface pe-4 ps-11 text-base text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
           autoComplete="off"
           dir="auto"
         />

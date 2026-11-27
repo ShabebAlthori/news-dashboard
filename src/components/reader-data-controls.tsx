@@ -49,7 +49,7 @@ export function ReaderDataControls() {
     setNote({ key: "settings.imported", vars: { saved: result.addedSaved, read: result.addedRead }, ok: true });
   }
 
-  const button = "inline-flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium text-fg hover:bg-surface-2";
+  const button = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-4 text-sm font-medium text-fg hover:bg-surface-2";
   return (
     <div className="space-y-2">
       <p className="font-medium text-fg">{t("settings.backup")}</p>

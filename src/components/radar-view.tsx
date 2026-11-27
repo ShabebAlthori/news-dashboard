@@ -91,12 +91,13 @@ function RadarEntry({ item, showSummary, timeMode }: { item: RadarItem; showSumm
             </span>
           )}
         </div>
-        <a href={item.url} target="_blank" rel="noopener noreferrer" lang="en" dir="ltr" className="group mt-1.5 flex items-start gap-1.5 text-[15px] font-medium leading-snug text-fg">
-          <span className="headline-link">{item.title}</span>
-          <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+        {/* English text keeps its own direction; in Arabic it aligns with the rest of the entry. */}
+        <a href={item.url} target="_blank" rel="noopener noreferrer" lang="en" dir="ltr" className="headline-link group mt-1.5 block text-[15px] font-medium leading-snug text-fg rtl:text-right">
+          <span>{item.title}</span>
+          <ArrowUpRight className="ms-1 inline size-3.5 align-[-2px] text-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
         </a>
         {showSummary && item.summary && (
-          <p lang="en" dir="ltr" className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">
+          <p lang="en" dir="ltr" className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted rtl:text-right">
             {item.summary}
           </p>
         )}
@@ -248,7 +249,7 @@ export function RadarView() {
   }
 
   const pill = (on: boolean) =>
-    `inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors ${on ? "bg-surface-2 font-medium text-fg" : "text-muted hover:text-fg"}`;
+    `inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm transition-colors ${on ? "bg-surface-2 font-medium text-fg" : "text-muted hover:text-fg"}`;
 
   return (
     <>
@@ -296,16 +297,31 @@ export function RadarView() {
               <EmptyState title={items.length ? t("radar.emptyType") : t("radar.empty")} />
             ) : (
               <div className="space-y-8">
-                {groups.map((g) => (
-                  <section key={g.key} aria-label={g.label}>
-                    <h2 className="eyebrow mb-4 ps-[4.75rem] sm:ps-[5.5rem]">{g.label}</h2>
-                    <ol className="[&>li:last-child>div:last-child]:pb-2">
-                      {g.items.map((item) => (
-                        <RadarEntry key={item.id} item={item} showSummary timeMode={g.key === "undated" ? "relative" : "clock"} />
-                      ))}
-                    </ol>
-                  </section>
-                ))}
+                {groups.map((g) => {
+                  // "All": arXiv publishes papers in daily batches; at most three per day here, so a
+                  // batch never buries the releases and updates of the same day.
+                  const papers = g.items.filter((i) => i.type === "research");
+                  const hidden = !type && papers.length > 3 ? papers.slice(3) : [];
+                  const items = hidden.length ? g.items.filter((i) => !hidden.includes(i)) : g.items;
+                  return (
+                    <section key={g.key} aria-label={g.label}>
+                      <h2 className="eyebrow mb-4 ps-[4.75rem] sm:ps-[5.5rem]">{g.label}</h2>
+                      <ol className="[&>li:last-child>div:last-child]:pb-2">
+                        {items.map((item) => (
+                          <RadarEntry key={item.id} item={item} showSummary timeMode={g.key === "undated" ? "relative" : "clock"} />
+                        ))}
+                      </ol>
+                      {hidden.length > 0 && (
+                        <div className="ps-[4.75rem] sm:ps-[5.5rem]">
+                          <button type="button" onClick={() => update({ type: "research" })} className="inline-flex min-h-11 items-center gap-2 text-sm text-muted hover:text-fg">
+                            <span className="size-1.5 rounded-full" style={{ background: TYPE_COLORS.research }} aria-hidden />
+                            {t("radar.morePapers", { n: hidden.length })}
+                          </button>
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
                 {filtered.length > limit && (
                   <div className="ps-[4.75rem] sm:ps-[5.5rem]">
                     <button type="button" onClick={() => setLimit(limit + 40)} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm font-medium text-fg hover:bg-surface-2">

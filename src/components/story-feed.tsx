@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, Star } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import useSWR from "swr";
@@ -10,7 +10,7 @@ import { categoriesFor, COMPANIES, MORE_TOPIC_IDS, PRIORITY_IDS, shortCategoryLa
 import type { Prefs, StoriesResponse } from "@/lib/shared/types";
 import { useNow, useUi } from "./providers";
 import { StoryCard } from "./story-card";
-import { CATEGORY_ICONS } from "./story-visuals";
+import { categoryTint } from "./story-visuals";
 import { EmptyState, ErrorState, ListSkeleton, NewStoriesBanner } from "./states";
 import { useStatus } from "./use-data";
 
@@ -71,17 +71,17 @@ export function useUpdateParams() {
 }
 
 function selectClass() {
-  return "h-11 rounded-full border border-line bg-surface px-3 text-sm text-fg transition-colors hover:border-line-strong";
+  return "h-11 rounded-lg border border-line bg-surface px-3 text-sm text-fg transition-colors hover:border-line-strong";
 }
 
-function ChipIcon({ id, on }: { id: string; on: boolean }) {
-  const Icon = CATEGORY_ICONS[id];
-  return Icon ? <Icon className={`size-4 ${on ? "" : "text-accent"}`} aria-hidden /> : null;
+/** The category's colour mark (the same one used next to category names in stories). */
+function ChipMark({ id }: { id: string }) {
+  return <span className="size-1.5 shrink-0 rounded-full" style={{ background: categoryTint(id).mark }} aria-hidden />;
 }
 
 function chipClass(on: boolean) {
-  return `inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-colors ${
-    on ? "brand-gradient border-transparent text-white" : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg"
+  return `inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm transition-colors ${
+    on ? "border-line-strong bg-surface-2 font-medium text-fg" : "border-line text-muted hover:border-line-strong hover:text-fg"
   }`;
 }
 
@@ -141,7 +141,7 @@ export function StoryFeed(cfg: FeedConfig) {
   return (
     <section>
       {/* Filters */}
-      <div className="mb-5 space-y-3">
+      <div className="mb-8 space-y-3">
         {categories.length > 0 && (
           <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="toolbar" aria-label={t("filters.category")}>
             <div className="flex w-max gap-1.5 sm:w-auto sm:flex-wrap">
@@ -151,7 +151,6 @@ export function StoryFeed(cfg: FeedConfig) {
                 aria-pressed={!p.category}
                 className={chipClass(!p.category)}
               >
-                <Star className="size-4" aria-hidden />
                 {t("filters.allCategories")}
               </button>
               {categories.map((c) => (
@@ -162,7 +161,7 @@ export function StoryFeed(cfg: FeedConfig) {
                   aria-pressed={p.category === c.id}
                   className={chipClass(p.category === c.id)}
                 >
-                  <ChipIcon id={c.id} on={p.category === c.id} />
+                  <ChipMark id={c.id} />
                   {c[lang]}
                 </button>
               ))}
@@ -213,7 +212,7 @@ export function StoryFeed(cfg: FeedConfig) {
               <option value="newest">{t("sort.newest")}</option>
             </select>
           </label>
-          <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm text-fg" title={t("filters.groupHint")}>
+          <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-line px-3 text-sm text-fg" title={t("filters.groupHint")}>
             <input type="checkbox" checked={p.group} onChange={(e) => update({ group: e.target.checked ? null : "0" })} className="size-4 accent-[var(--accent)]" />
             {t("filters.group")}
           </label>
@@ -221,7 +220,7 @@ export function StoryFeed(cfg: FeedConfig) {
             <button
               type="button"
               onClick={() => update({ cat: null, co: null, range: null, from: null, to: null, sort: null, group: null })}
-              className="inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-sm text-muted hover:text-fg"
+              className="inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-muted hover:text-fg"
             >
               <RotateCcw className="size-3.5" aria-hidden />
               {t("filters.reset")}
@@ -244,17 +243,19 @@ export function StoryFeed(cfg: FeedConfig) {
           <EmptyState title={cfg.emptyTitle ?? t("list.empty")} hint={cfg.emptyHint ?? t("list.emptyHint")} />
         )
       ) : (
-        <div className="space-y-3">
-          {stories.map((s) => (
-            <StoryCard key={s.id} story={s} showImage={prefs?.showImages ?? true} />
-          ))}
+        <div>
+          <div className="rule-list">
+            {stories.map((s) => (
+              <StoryCard key={s.id} story={s} showImage={prefs?.showImages ?? true} />
+            ))}
+          </div>
           {hasMore && (
-            <div className="pt-2 text-center">
+            <div className="border-t border-line pt-6 text-center">
               <button
                 type="button"
                 onClick={() => setSize(size + 1)}
                 disabled={isValidating}
-                className="rounded-full border border-line bg-surface px-5 py-2 text-sm font-medium text-fg hover:bg-surface-2 disabled:opacity-60"
+                className="inline-flex min-h-11 items-center rounded-lg border border-line px-5 text-sm font-medium text-fg hover:bg-surface-2 disabled:opacity-60"
               >
                 {isValidating ? t("common.loading") : t("list.loadMore")}
               </button>

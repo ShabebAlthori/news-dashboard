@@ -93,7 +93,7 @@ function CategoryNav() {
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  className={`relative inline-flex h-11 items-center whitespace-nowrap px-2 text-[13.5px] transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:content-[''] ${
+                  className={`relative inline-flex h-11 min-w-11 items-center justify-center whitespace-nowrap px-2 text-[13.5px] transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:content-[''] ${
                     active ? "font-medium text-fg after:bg-accent" : "text-muted hover:text-fg after:bg-transparent"
                   }`}
                 >

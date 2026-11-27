@@ -23,7 +23,7 @@ export function LanguageToggle({ className = "", compact = false }: { className?
             lang={o.value}
             onClick={() => setLang(o.value)}
             // 44px tall hit area around a compact 32px segment.
-            className={`relative inline-flex h-8 min-w-9 items-center justify-center rounded-md px-2 text-[13px] font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] ${
+            className={`relative inline-flex h-8 min-w-9 items-center justify-center rounded-md px-2 text-[13px] font-medium transition-colors after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-[''] ${
               lang === o.value ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg"
             }`}
           >
