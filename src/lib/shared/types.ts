@@ -146,6 +146,11 @@ export interface StatusResponse {
     pendingTitles?: number;
   };
   serverTime: string;
+  /**
+   * Web edition: when the data on screen is older than status.json says (e.g. an offline copy
+   * served by the service worker), its generation time. Freshness uses the older of the two.
+   */
+  displayedAt?: string | null;
 }
 
 export interface Prefs {

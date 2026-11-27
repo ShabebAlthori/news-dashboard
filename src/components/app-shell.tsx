@@ -9,6 +9,7 @@ import { Brand, TechPulseMark } from "./brand";
 import { LanguageToggle, ThemeSwitch } from "./controls";
 import { useUi } from "./providers";
 import { StaleNotice, StatusCard } from "./status-indicator";
+import { IS_STATIC, BASE_PATH } from "@/lib/client/mode";
 import { Notifications, ProfileMenu, SearchBox } from "./top-bar";
 
 const NAV: { href: string; key: I18nKey; icon: typeof House }[] = [
@@ -162,6 +163,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     setLastPath(pathname);
     if (drawerOpen) setDrawerOpen(false);
   }
+
+  // Web edition: install the service worker (offline copy of the app and the latest data).
+  useEffect(() => {
+    if (!IS_STATIC || !("serviceWorker" in navigator) || !window.isSecureContext) return;
+    navigator.serviceWorker.register(`${BASE_PATH}/sw.js`, { scope: `${BASE_PATH}/` }).catch(() => {
+      // Not fatal: the site works without it, just not offline.
+    });
+  }, []);
 
   useEffect(() => {
     if (!drawerOpen) return;

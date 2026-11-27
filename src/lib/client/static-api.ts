@@ -8,6 +8,7 @@ import type { Section } from "@/lib/shared/taxonomy";
 import { nextReportAt } from "@/lib/shared/schedule";
 import type { HomeFile, Prefs, RadarResponse, ReportResponse, Snapshot, SnapshotStory, SourceHealth, StatusResponse, StoriesResponse, Story, WeeklyReport } from "@/lib/shared/types";
 import { normalizePrefs } from "@/lib/shared/prefs";
+import { mutate } from "swr";
 import { BASE_PATH } from "./mode";
 
 interface StatusFile {
@@ -23,6 +24,16 @@ const MAX_READ = 4000;
 let snapshot: Snapshot | null = null;
 let snapshotPromise: Promise<Snapshot> | null = null;
 let latestGeneratedAt: string | null = null;
+/** Generation time of the data files currently used for display (home.json / snapshot.json). */
+let displayedGeneratedAt: number | null = null;
+function noteDisplayed(generatedAt: string) {
+  const t = Date.parse(generatedAt);
+  if (!Number.isFinite(t) || t === displayedGeneratedAt) return;
+  displayedGeneratedAt = t;
+  // Older than what status.json reports (e.g. a cached offline copy): re-read the status now, so
+  // the "Data is X old" notice appears with the data rather than at the next poll.
+  if (latestGeneratedAt && t < Date.parse(latestGeneratedAt) - 60_000) void mutate("/api/status");
+}
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -75,6 +86,7 @@ async function getSnapshot(): Promise<Snapshot> {
     snapshotPromise = getJson<Snapshot>("snapshot.json", latestGeneratedAt ?? String(Math.floor(Date.now() / 60_000)))
       .then((s) => {
         snapshot = s;
+        noteDisplayed(s.generatedAt);
         return s;
       })
       .finally(() => {
@@ -112,7 +124,12 @@ function homeFromSnapshot(s: Snapshot): HomeFile {
 }
 
 function getHome(): Promise<HomeFile> {
-  return getDataFile<HomeFile>("home.json").catch(async () => homeFromSnapshot(await getSnapshot()));
+  return getDataFile<HomeFile>("home.json")
+    .then((home) => {
+      noteDisplayed(home.generatedAt);
+      return home;
+    })
+    .catch(async () => homeFromSnapshot(await getSnapshot()));
 }
 
 export function getPrefs(defaults: Prefs): Prefs {
@@ -147,7 +164,15 @@ export async function staticFetch<T>(key: string): Promise<T> {
       const file = await loadStatusFile();
       const last = file.status.lastSuccessAt ? new Date(file.status.lastSuccessAt).getTime() : null;
       const interval = file.status.intervalMinutes || 15;
-      return { ...file.status, running: false, nextRunAt: last ? new Date(last + interval * 60_000).toISOString() : null } as T;
+      // An older copy on screen (offline, cached by the service worker) is reported, so the
+      // "Data is X old" notice reflects what the reader actually sees.
+      const older = displayedGeneratedAt != null && displayedGeneratedAt < Date.parse(file.generatedAt) - 60_000;
+      return {
+        ...file.status,
+        running: false,
+        nextRunAt: last ? new Date(last + interval * 60_000).toISOString() : null,
+        displayedAt: older ? new Date(displayedGeneratedAt!).toISOString() : null,
+      } as T;
     }
     case "/api/sources":
       return (await loadStatusFile()).sources as T;

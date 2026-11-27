@@ -56,11 +56,18 @@ export function freshnessDot(fresh: Freshness, failing = 0): string {
 }
 
 /** Visible notice when the data is older than it should be (amber and red states). */
+/** The older of the last update and the data actually on screen (see StatusResponse.displayedAt). */
+function shownSince(data: { lastSuccessAt: string | null; displayedAt?: string | null } | undefined): string | null {
+  if (!data) return null;
+  if (data.displayedAt && (!data.lastSuccessAt || data.displayedAt < data.lastSuccessAt)) return data.displayedAt;
+  return data.lastSuccessAt;
+}
+
 export function StaleNotice() {
   const { t, lang } = useUi();
   const now = useNow(60_000);
   const { data } = useStatus();
-  const fresh = dataFreshness(data?.lastSuccessAt, data?.intervalMinutes, now);
+  const fresh = dataFreshness(shownSince(data), data?.intervalMinutes, now);
   if (!data || fresh.ageMs == null || (fresh.level !== "aging" && fresh.level !== "stale")) return null;
   const red = fresh.level === "stale";
   return (
@@ -83,7 +90,7 @@ export function StatusCard({ rail = false }: { rail?: boolean }) {
   const now = useNow(30_000);
   const { refresh, running, note, status } = useRefresh();
   const failing = status?.sources.failing ?? 0;
-  const fresh = dataFreshness(status?.lastSuccessAt, status?.intervalMinutes, now);
+  const fresh = dataFreshness(shownSince(status), status?.intervalMinutes, now);
   const dot = !status ? "bg-subtle" : running ? "bg-accent animate-pulse" : freshnessDot(fresh, failing);
   const relative = status?.lastSuccessAt ? formatRelative(status.lastSuccessAt, lang, now) : null;
   const exact = status?.lastSuccessAt ? t("status.lastUpdateAt", { time: formatDateTime(status.lastSuccessAt, lang, now) }) : t("status.never");
