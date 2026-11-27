@@ -144,7 +144,7 @@ export function BookmarkButton({ story, className = "", tone = "default" }: { st
       aria-pressed={saved}
       aria-label={saved ? t("card.saved") : t("card.save")}
       title={saved ? t("card.saved") : t("card.save")}
-      className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full transition-colors ${tones} ${className}`}
+      className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors ${tones} ${className}`}
     >
       <Bookmark className={`size-[18px] ${saved ? "fill-current" : ""}`} aria-hidden />
     </button>

@@ -28,7 +28,7 @@ export function TechPulseMark({ className = "size-9" }: { className?: string }) 
 export function Brand({ tagline = true, compact = false, onNavigate }: { tagline?: boolean; compact?: boolean; onNavigate?: () => void }) {
   const { t } = useUi();
   return (
-    <Link href="/" onClick={onNavigate} className="flex items-center gap-3 rounded-lg" aria-label={compact ? t("app.name") : undefined}>
+    <Link href="/" onClick={onNavigate} className="flex min-h-11 min-w-11 items-center gap-3 rounded-lg" aria-label={compact ? t("app.name") : undefined}>
       <TechPulseMark className={compact ? "size-9" : "size-10"} />
       {!compact && (
         <span className="leading-tight">

@@ -72,7 +72,7 @@ export function Popover({
         title={label}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`relative inline-flex size-10 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 ${open ? "bg-surface-2" : ""}`}
+        className={`relative inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 ${open ? "bg-surface-2" : ""}`}
       >
         {trigger}
         {badge}
@@ -81,7 +81,7 @@ export function Popover({
         role="dialog"
         aria-label={label}
         inert={!open}
-        className={`absolute end-0 top-12 z-50 ${width} max-w-[calc(100vw-24px)] max-md:fixed max-md:inset-x-3 max-md:top-14 max-md:w-auto max-md:max-w-none origin-top rounded-2xl border border-line bg-surface p-2 shadow-lift transition duration-150 ease-out rtl:origin-top-left ltr:origin-top-right ${
+        className={`absolute end-0 top-[52px] z-50 ${width} max-w-[calc(100vw-24px)] max-md:fixed max-md:inset-x-3 max-md:top-14 max-md:w-auto max-md:max-w-none origin-top rounded-2xl border border-line bg-surface p-2 shadow-lift transition duration-150 ease-out rtl:origin-top-left ltr:origin-top-right ${
           open ? "visible scale-100 opacity-100" : "invisible scale-95 opacity-0"
         }`}
       >

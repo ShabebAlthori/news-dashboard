@@ -99,7 +99,7 @@ export function ReportPanel() {
       <div className="relative mt-auto space-y-2 pt-4">
         <Link
           href="/report"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/20"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/20"
         >
           <CalendarDays className="size-4" aria-hidden />
           {data?.latest ? t("report.view") : t("report.every")}

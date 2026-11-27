@@ -194,10 +194,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         {/* Top bar — phones */}
-        <header className="glass sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2 md:hidden">
-          <Brand tagline={false} />
+        <header className="glass sticky top-0 z-30 flex items-center justify-between gap-1 border-b border-line/60 px-2 py-1.5 md:hidden">
+          {/* The wordmark needs ~110px: shown only when the five 44px controls still fit beside it. */}
+          <span className="min-[440px]:hidden">
+            <Brand compact />
+          </span>
+          <span className="hidden min-[440px]:block">
+            <Brand tagline={false} />
+          </span>
           <div className="flex items-center gap-0.5">
-            <Link href="/search" className="inline-flex size-10 items-center justify-center rounded-full text-fg hover:bg-surface-2" aria-label={t("nav.search")}>
+            <Link href="/search" className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2" aria-label={t("nav.search")}>
               <Search className="size-5" aria-hidden />
             </Link>
             <LanguageToggle compact />
@@ -205,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="inline-flex size-10 items-center justify-center rounded-full text-fg hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
               aria-label={t("nav.menu")}
               aria-expanded={drawerOpen}
             >
@@ -214,13 +220,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main id="content" className="mx-auto w-full max-w-[1480px] flex-1 px-4 pb-28 pt-4 sm:px-6 md:pb-12 md:pt-6 lg:px-8">
+        <main id="content" className="mx-auto w-full max-w-[1480px] flex-1 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 md:pb-12 md:pt-6 lg:px-8">
           <StaleNotice />
           {children}
         </main>
 
         {/* Bottom navigation — phones */}
-        <nav className="glass fixed inset-x-0 bottom-0 z-30 border-t border-line/60 pb-[env(safe-area-inset-bottom)] md:hidden" aria-label={t("nav.menu")}>
+        {/* Opaque, so list text never shows through the labels; padded above the home indicator. */}
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-sidebar pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.5)] md:hidden" aria-label={t("nav.menu")}>
           <ul className="grid grid-cols-5">
             {NAV.filter((n) => MOBILE_TABS.includes(n.href)).map(({ href, icon: Icon }) => {
               const active = isActive(pathname, href);
@@ -229,7 +236,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Link
                     href={href}
                     aria-current={active ? "page" : undefined}
-                    className={`flex flex-col items-center gap-1 px-1 pb-2 pt-2.5 text-[11px] ${active ? "font-semibold text-accent" : "text-muted"}`}
+                    className={`flex min-h-14 flex-col items-center gap-1 px-1 pb-2 pt-2.5 text-xs ${active ? "font-semibold text-accent" : "text-muted"}`}
                   >
                     <span className={`inline-flex h-7 w-12 items-center justify-center rounded-full transition-colors ${active ? "bg-accent-soft" : ""}`}>
                       <Icon className="size-5" aria-hidden />
@@ -259,7 +266,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <div className="flex items-center justify-between">
             <Brand onNavigate={() => setDrawerOpen(false)} />
-            <button type="button" onClick={() => setDrawerOpen(false)} className="inline-flex size-10 items-center justify-center rounded-full hover:bg-surface-2" aria-label={t("nav.close")}>
+            <button type="button" onClick={() => setDrawerOpen(false)} className="inline-flex size-11 items-center justify-center rounded-full hover:bg-surface-2" aria-label={t("nav.close")}>
               <X className="size-5" aria-hidden />
             </button>
           </div>

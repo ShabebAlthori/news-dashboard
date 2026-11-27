@@ -42,3 +42,13 @@ describe("tokenize", () => {
     expect(a.filter((t) => b.includes(t))).toEqual(expect.arrayContaining(["nvidia", "jensen", "huang", "reinstat"]));
   });
 });
+
+describe("feed footers", () => {
+  it("removes English and Arabic 'appeared first on' footers", async () => {
+    const { stripBoilerplate } = await import("@/lib/server/text");
+    expect(stripBoilerplate("Great news. The post Foo bar appeared first on Example.")).toBe("Great news.");
+    expect(stripBoilerplate("واجه الهجوم. نُشر المقال فيفا يؤكد تعرضه لهجوم سيبراني أولًا على البوابة التقنية .")).toBe("واجه الهجوم.");
+    expect(stripBoilerplate("ما مضت…\nالتدوينة لعبة The Witcher 4 ستأتي في علبة فعلية ظهرت أولاً على عالم التقنية .")).toBe("ما مضت…");
+    expect(stripBoilerplate("النص لا يحتوي على تذييل.")).toBe("النص لا يحتوي على تذييل.");
+  });
+});

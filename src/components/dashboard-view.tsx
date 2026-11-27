@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowRight, BadgeCheck, Building2, ChevronLeft, ChevronRight, Clock, Lightbulb, Newspaper, Sparkles, Star } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, ChevronLeft, ChevronRight, Clock, Lightbulb, Newspaper, Pause, Play, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import useSWR from "swr";
 import { markRead } from "@/lib/client/actions";
 import { formatLongDate, formatRelative } from "@/lib/shared/format";
@@ -24,7 +24,7 @@ import { useHasNewer, useStatus } from "./use-data";
 function ViewAll({ href, label }: { href: string; label?: string }) {
   const { t } = useUi();
   return (
-    <Link href={href} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-medium text-accent hover:underline">
+    <Link href={href} className="inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap text-sm font-medium text-accent hover:underline">
       {label ?? t("dash.seeAll")}
       <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
     </Link>
@@ -59,11 +59,18 @@ function HeroSlide({ story, active, eager }: { story: Story; active: boolean; ea
   const h = storyHeadline(story, lang);
   const sum = storySummary(story, lang);
   return (
-    <div className={`absolute inset-0 transition-opacity duration-500 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`} aria-hidden={!active} inert={!active}>
+    // All slides share one grid cell, so the carousel is as tall as its longest headline and never jumps.
+    <div
+      className={`relative flex min-h-[420px] transition-[opacity,visibility] duration-500 [grid-area:1/1] sm:min-h-[400px] lg:min-h-[392px] ${active ? "visible opacity-100" : "invisible opacity-0"}`}
+      aria-hidden={!active}
+      inert={!active}
+      role="group"
+      aria-roledescription="slide"
+    >
       <StoryImage story={story} category={category} eager={eager} className="absolute inset-0 size-full" />
       {/* Legibility: dark gradient from the text side, and from the bottom on small screens. */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#070914] via-[#070914]/75 to-[#070914]/10 md:bg-gradient-to-r md:from-[#070914] md:via-[#070914]/80 md:to-transparent md:rtl:bg-gradient-to-l" />
-      <div className="relative flex h-full flex-col justify-end p-5 sm:p-7 md:max-w-[72%] md:justify-center lg:p-8 2xl:max-w-[62%]">
+      <div className="relative flex w-full flex-col justify-end p-5 pb-20 sm:p-7 sm:pb-20 md:max-w-[72%] md:justify-center md:pb-16 lg:p-8 lg:pb-16 2xl:max-w-[62%]">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#20d98a] px-3 py-1 text-xs font-bold text-[#052016]">
             <Star className="size-3.5 fill-current" aria-hidden />
@@ -78,11 +85,16 @@ function HeroSlide({ story, active, eager }: { story: Story; active: boolean; ea
             </span>
           )}
         </div>
-        <h2 lang={h.lang} dir={h.lang === "ar" ? "rtl" : "ltr"} className={`font-bold leading-tight text-white ${h.text.length > 90 ? "text-xl sm:text-2xl lg:text-[28px]" : "text-2xl sm:text-[28px] lg:text-[32px]"}`}>
-          <a href={story.url} target="_blank" rel="noopener noreferrer" onClick={() => markRead(story.leadArticleId, story.url)} className="line-clamp-3 hover:underline hover:decoration-white/50 hover:underline-offset-4">
+        {/* The full headline on phones (type scales with the screen); long ones are clamped only on wide layouts. */}
+        <h3
+          lang={h.lang}
+          dir={h.lang === "ar" ? "rtl" : "ltr"}
+          className={`font-bold leading-tight text-white ${h.text.length > 90 ? "text-[clamp(1.15rem,5vw,1.5rem)] md:text-2xl lg:text-[28px]" : "text-[clamp(1.3rem,5.6vw,1.75rem)] md:text-[28px] lg:text-[32px]"}`}
+        >
+          <a href={story.url} target="_blank" rel="noopener noreferrer" onClick={() => markRead(story.leadArticleId, story.url)} className="hover:underline hover:decoration-white/50 hover:underline-offset-4 md:line-clamp-4">
             {h.text}
           </a>
-        </h2>
+        </h3>
         {sum && (
           <p lang={sum.lang} dir={sum.lang === "ar" ? "rtl" : "ltr"} className="mt-3 line-clamp-3 text-[15px] leading-relaxed text-white/80 sm:text-base">
             {sum.text}
@@ -106,7 +118,7 @@ function HeroSlide({ story, active, eager }: { story: Story; active: boolean; ea
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => markRead(story.leadArticleId, story.url)}
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"
           >
             {t("hero.readMore")}
             <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
@@ -118,31 +130,44 @@ function HeroSlide({ story, active, eager }: { story: Story; active: boolean; ea
   );
 }
 
+function subscribeReducedMotion(onChange: () => void) {
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
 function HeroCarousel({ stories }: { stories: Story[] }) {
   const { t } = useUi();
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // Hover/focus pause the rotation for a moment; the button pauses it until pressed again.
+  const [hovered, setHovered] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => true);
   const touch = useRef<number | null>(null);
   const n = stories.length;
   const current = n ? Math.min(index, n - 1) : 0;
   const go = (i: number) => setIndex(((i % n) + n) % n);
+  const rotating = n > 1 && !reducedMotion && !userPaused && !hovered;
 
   useEffect(() => {
-    if (n < 2 || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!rotating) return;
     const id = setInterval(() => setIndex((i) => (i + 1) % n), 9000);
     return () => clearInterval(id);
-  }, [n, paused]);
+  }, [n, rotating]);
 
   if (!n) return null;
+  const control = "relative inline-flex size-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur transition-colors hover:bg-black/75";
   return (
     <section
       aria-roledescription="carousel"
       aria-label={t("hero.label")}
-      className="card relative min-h-[420px] overflow-hidden border-line sm:min-h-[400px] lg:min-h-[392px]"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      className="card relative grid overflow-hidden border-line"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false);
+      }}
       onTouchStart={(e) => (touch.current = e.touches[0].clientX)}
       onTouchEnd={(e) => {
         if (touch.current == null) return;
@@ -153,24 +178,36 @@ function HeroCarousel({ stories }: { stories: Story[] }) {
         go(current + (forward ? 1 : -1));
       }}
     >
-      {stories.map((s, i) => (
-        <HeroSlide key={s.id} story={s} active={i === current} eager={i === 0} />
-      ))}
+      <h2 className="sr-only">{t("hero.label")}</h2>
+      {/* Screen readers hear slide changes only when the reader caused them. */}
+      <div className="grid" aria-live={rotating ? "off" : "polite"}>
+        {stories.map((s, i) => (
+          <HeroSlide key={s.id} story={s} active={i === current} eager={i === 0} />
+        ))}
+      </div>
       {n > 1 && (
         <div className="absolute bottom-4 end-4 z-10 flex items-center gap-1.5">
-          <span dir="ltr" className="rounded-full bg-black/50 px-3 py-1 text-xs font-semibold tabular-nums text-white backdrop-blur" aria-live="polite">
-            {current + 1} / {n}
+          {!reducedMotion && (
+            <button type="button" onClick={() => setUserPaused(!userPaused)} aria-label={userPaused ? t("hero.play") : t("hero.pause")} title={userPaused ? t("hero.play") : t("hero.pause")} className={control}>
+              {userPaused ? <Play className="size-4" aria-hidden /> : <Pause className="size-4" aria-hidden />}
+            </button>
+          )}
+          <span dir="ltr" className="rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold tabular-nums text-white backdrop-blur">
+            <span className="sr-only">{t("hero.position", { i: current + 1, n })}</span>
+            <span aria-hidden>
+              {current + 1} / {n}
+            </span>
           </span>
-          <button type="button" onClick={() => go(current - 1)} aria-label={t("hero.prev")} className="inline-flex size-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70">
-            <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
+          <button type="button" onClick={() => go(current - 1)} aria-label={t("hero.prev")} className={control}>
+            <ChevronLeft className="size-5 rtl:-scale-x-100" aria-hidden />
           </button>
-          <button type="button" onClick={() => go(current + 1)} aria-label={t("hero.next")} className="inline-flex size-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70">
-            <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
+          <button type="button" onClick={() => go(current + 1)} aria-label={t("hero.next")} className={control}>
+            <ChevronRight className="size-5 rtl:-scale-x-100" aria-hidden />
           </button>
         </div>
       )}
       {n > 1 && (
-        <div className="absolute bottom-5 start-5 z-10 hidden gap-1.5 md:flex lg:start-8">
+        <div className="absolute bottom-[34px] start-5 z-10 hidden gap-1.5 md:flex lg:start-8">
           {stories.map((s, i) => (
             <button
               key={s.id}
@@ -178,7 +215,8 @@ function HeroCarousel({ stories }: { stories: Story[] }) {
               onClick={() => go(i)}
               aria-label={t("hero.goto", { i: i + 1 })}
               aria-current={i === current}
-              className={`h-1.5 rounded-full transition-all ${i === current ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/70"}`}
+              // A small dot with a 44px touch area around it.
+              className={`relative h-1.5 rounded-full transition-all after:absolute after:-inset-x-1.5 after:-inset-y-5 after:content-[''] ${i === current ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/70"}`}
             />
           ))}
         </div>
@@ -245,7 +283,9 @@ function DailyBriefing({ stories, facts }: { stories: Story[]; facts: BriefingFa
                     </span>
                     <OriginalLangTag langs={[h.lang]} className="mt-1" />
                   </span>
-                  {s.publishedAt && <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-subtle">{formatRelative(s.publishedAt, lang, now)}</span>}
+                  <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-subtle">
+                    {s.publishedAt ? formatRelative(s.publishedAt, lang, now) : t("card.retrievedAgo", { time: formatRelative(s.fetchedAt, lang, now) })}
+                  </span>
                 </a>
               </li>
             );
@@ -313,8 +353,8 @@ function TrendingCompanies({ companies }: { companies: CompanyPulse[] }) {
               const label = `${name}: ${t("trending.count", { n: c.count })}`;
               return (
                 <li key={c.companyId}>
-                  <Link href={`/companies?co=${c.companyId}`} title={label} aria-label={label} className="block rounded-[28%] opacity-75 transition-opacity hover:opacity-100">
-                    <CompanyLogo id={c.companyId} size={30} />
+                  <Link href={`/companies?co=${c.companyId}`} title={label} aria-label={label} className="block rounded-[28%] p-1.5 opacity-75 transition-opacity hover:opacity-100">
+                    <CompanyLogo id={c.companyId} size={32} />
                   </Link>
                 </li>
               );
@@ -388,6 +428,9 @@ export function DashboardView() {
   const chips = <CategoryChips value={category} onChange={(id) => update({ cat: id })} />;
   const header = (
     <div className="mb-5 space-y-4">
+      <h1 className="sr-only">
+        {t("app.name")} — {t("dash.title")}
+      </h1>
       <p className="text-sm text-muted">{formatLongDate(new Date(now), lang)}</p>
       {chips}
     </div>
@@ -490,7 +533,7 @@ export function DashboardView() {
                   return (
                     <li key={c.categoryId} className="card flex flex-col p-4">
                       <div className="mb-2.5 flex items-baseline justify-between gap-2">
-                        <button type="button" onClick={() => update({ cat: c.categoryId })} className="text-start font-semibold text-fg hover:text-accent">
+                        <button type="button" onClick={() => update({ cat: c.categoryId })} className="-my-2 min-h-11 text-start font-semibold text-fg hover:text-accent">
                           <span className="me-1.5 text-xs font-semibold tabular-nums text-accent">{i + 1}</span>
                           {full?.[lang] ?? c.categoryId}
                         </button>

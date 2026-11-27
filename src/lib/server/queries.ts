@@ -6,9 +6,15 @@ import { getDb, parseJsonArray } from "./db";
 import { coverageFactor, finalScore, impactFactor, isBreaking, relevanceFactor, tier, toRelevancePrefs, type RelevancePrefs } from "./scoring";
 import { searchTerms } from "@/lib/shared/search";
 import { getPrefs } from "./settings";
+import { stripBoilerplate } from "./text";
 import { SOURCES, sourceById } from "./sources";
 
 const HOUR = 3_600_000;
+
+function clean(text: string | null): string | null {
+  if (!text) return text;
+  return stripBoilerplate(text) || null;
+}
 
 interface ClusterRow {
   id: number;
@@ -115,7 +121,7 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
         publishedAt: iso(m.published_at),
         fetchedAt: iso(m.fetched_at)!,
         official: src?.kind === "official",
-        excerpt: m.summary_en ?? m.summary_ar,
+        excerpt: clean(m.summary_en ?? m.summary_ar),
         lang: src?.lang ?? "en",
       };
     });
@@ -128,8 +134,9 @@ function hydrate(db: Database.Database, clusters: (ClusterRow & { score: number;
       leadArticleId: lead.id,
       title: { original: lead.title, en: lead.title_en || lead.title, ar: lead.title_ar },
       summary: {
-        en: lead.summary_en,
-        ar: lead.summary_ar,
+        // Feed footers ("The post … appeared first on …") are also removed from stored excerpts.
+        en: clean(lead.summary_en),
+        ar: clean(lead.summary_ar),
         origin: (lead.summary_origin as Story["summary"]["origin"]) ?? "none",
         aiModel: lead.ai_model,
       },
@@ -287,7 +294,7 @@ function listUngrouped(db: Database.Database, clusters: Candidate[], now: number
         id: -lead.id, // unique key per article in ungrouped mode
         leadArticleId: lead.id,
         title: { original: lead.title, en: lead.title_en || lead.title, ar: lead.title_ar },
-        summary: { en: lead.summary_en, ar: lead.summary_ar, origin: lead.summary_origin as Story["summary"]["origin"], aiModel: lead.ai_model },
+        summary: { en: clean(lead.summary_en), ar: clean(lead.summary_ar), origin: lead.summary_origin as Story["summary"]["origin"], aiModel: lead.ai_model },
         url: lead.url,
         lang: src?.lang ?? "en",
         source: { id: lead.source_id, name: src?.name ?? lead.source_id, official: src?.kind === "official", ...(src ? { homepage: src.homepage } : {}) },

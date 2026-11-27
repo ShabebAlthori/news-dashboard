@@ -123,7 +123,7 @@ export function RadarPanel() {
           {t("radar.title")}
         </h2>
         {data && <RadarLiveBadge lastSuccessAt={data.lastSuccessAt} />}
-        <Link href="/radar" className="ms-auto inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+        <Link href="/radar" className="ms-auto inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent hover:underline">
           {t("dash.seeAll")}
           <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
         </Link>
@@ -239,7 +239,7 @@ export function RadarView() {
                       </h2>
                       <span className="text-sm text-subtle">{list.length}</span>
                       {list.length > 6 && (
-                        <button type="button" onClick={() => update({ type: ty })} className="ms-auto inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+                        <button type="button" onClick={() => update({ type: ty })} className="ms-auto inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent hover:underline">
                           {t("radar.seeType", { type: t(`radar.type.${ty}`) })}
                           <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
                         </button>

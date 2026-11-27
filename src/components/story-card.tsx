@@ -229,7 +229,9 @@ export function StoryCard({
                 <span className="text-subtle"> · {formatDateTime(story.publishedAt, uiLang, now)}</span>
               </time>
             ) : (
-              <span className="text-subtle">{t("card.noPubDate")}</span>
+              <time dateTime={story.fetchedAt} className="text-subtle" title={t("card.noPubDate")}>
+                {t("card.retrievedAgo", { time: formatRelative(story.fetchedAt, uiLang, now) })}
+              </time>
             )}
             {story.sourceCount > 1 && <span>{t("card.sources", { n: story.sourceCount })}</span>}
           </div>

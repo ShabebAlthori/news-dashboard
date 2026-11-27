@@ -96,7 +96,7 @@ export function StatusCard({ rail = false }: { rail?: boolean }) {
       disabled={running}
       aria-label={label}
       title={label}
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60"
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60"
     >
       <RefreshCw className={`size-[18px] ${running ? "animate-spin" : ""}`} aria-hidden />
     </button>

@@ -9,14 +9,15 @@ import { useNow, useUi } from "./providers";
 import { storyHeadline, storySummary } from "./story-text";
 import { BookmarkButton, CategoryBadge, OriginalLangTag, StoryImage, useStoryCategory } from "./story-visuals";
 
-export function StoryTime({ story, className = "", compact = false }: { story: Story; className?: string; compact?: boolean }) {
+export function StoryTime({ story, className = "" }: { story: Story; className?: string }) {
   const { t, lang } = useUi();
   const now = useNow();
   if (!story.publishedAt) {
+    // The source gave no publication time: say when we retrieved it, and explain on hover.
     return (
-      <span className={`text-subtle ${className}`} title={`${t("card.noPubDate")} · ${t("card.retrieved", { time: formatDateTime(story.fetchedAt, lang, now) })}`}>
-        {compact ? t("card.noPubDateShort") : t("card.noPubDate")}
-      </span>
+      <time dateTime={story.fetchedAt} className={`text-subtle ${className}`} title={`${t("card.noPubDate")} · ${t("card.retrieved", { time: formatDateTime(story.fetchedAt, lang, now) })}`}>
+        {t("card.retrievedAgo", { time: formatRelative(story.fetchedAt, lang, now) })}
+      </time>
     );
   }
   return (
@@ -64,7 +65,7 @@ export function NewsCard({ story }: { story: Story }) {
           </span>
           {story.source.official && <BadgeCheck className="size-3.5 shrink-0 text-ok" aria-label={t("card.officialHint")} />}
           <span aria-hidden>·</span>
-          <StoryTime story={story} compact className="shrink-0 whitespace-nowrap" />
+          <StoryTime story={story} className="shrink-0 whitespace-nowrap" />
           {story.sourceCount > 1 && <span className="hidden shrink-0 whitespace-nowrap text-subtle sm:inline">· {t("card.sources", { n: story.sourceCount })}</span>}
           <BookmarkButton story={story} className="-me-2 ms-auto" />
         </div>
@@ -94,7 +95,7 @@ export function StoryLine({ story, showSource = true }: { story: Story; showSour
         {showSource && <span dir="auto">{story.source.name}</span>}
         {showSource && <span aria-hidden>·</span>}
         <OriginalLangTag langs={[h.lang]} />
-        <StoryTime story={story} compact />
+        <StoryTime story={story} />
         {story.sourceCount > 1 && <span>· {t("card.sources", { n: story.sourceCount })}</span>}
         {story.tier === "major" && <span className="font-semibold text-accent">· {t("importance.major")}</span>}
       </p>

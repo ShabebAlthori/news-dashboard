@@ -65,28 +65,36 @@ export function PlatformLogo({ sourceId, platform, size = 40 }: { sourceId: stri
   return <Monogram name={platform} size={size} />;
 }
 
-/** The publisher's own site icon, with a monogram if it cannot be loaded. */
+/**
+ * The publisher's own site icon. A letter avatar is shown until the icon has loaded with a usable
+ * size, and stays when it fails (403 pages, empty files, hanging requests) — never a blank tile.
+ */
 export function SourceLogo({ source, size = 16 }: { source: Story["source"]; size?: number }) {
-  const [failed, setFailed] = useState(false);
+  const [state, setState] = useState<"loading" | "ok" | "failed">("loading");
   let icon: string | null = null;
   try {
     icon = source.homepage ? `${new URL(source.homepage).origin}/favicon.ico` : null;
   } catch {
     icon = null;
   }
-  if (!icon || failed) return <Monogram name={source.name} size={size} className="!rounded-[4px] !border-0" />;
+  const fallback = <Monogram name={source.name} size={size} className="!rounded-[4px] !border-0" />;
+  if (!icon || state === "failed") return fallback;
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- publisher-hosted site icons from many domains
-    <img
-      src={icon}
-      alt=""
-      width={size}
-      height={size}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      className="shrink-0 rounded-[4px] bg-white/90 object-contain"
-      style={{ width: size, height: size }}
-    />
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      {state !== "ok" && <span className="absolute inset-0">{fallback}</span>}
+      {/* eslint-disable-next-line @next/next/no-img-element -- publisher-hosted site icons from many domains */}
+      <img
+        src={icon}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onLoad={(e) => setState(e.currentTarget.naturalWidth >= 8 ? "ok" : "failed")}
+        onError={() => setState("failed")}
+        className={`rounded-[4px] object-contain transition-opacity ${state === "ok" ? "bg-white/90 opacity-100" : "opacity-0"}`}
+        style={{ width: size, height: size }}
+      />
+    </span>
   );
 }

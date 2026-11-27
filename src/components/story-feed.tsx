@@ -67,7 +67,7 @@ export function useUpdateParams() {
 }
 
 function selectClass() {
-  return "h-9 rounded-full border border-line bg-surface px-3 text-sm text-fg transition-colors hover:border-line-strong";
+  return "h-11 rounded-full border border-line bg-surface px-3 text-sm text-fg transition-colors hover:border-line-strong";
 }
 
 function ChipIcon({ id, on }: { id: string; on: boolean }) {
@@ -76,7 +76,7 @@ function ChipIcon({ id, on }: { id: string; on: boolean }) {
 }
 
 function chipClass(on: boolean) {
-  return `inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-colors ${
+  return `inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-colors ${
     on ? "brand-gradient border-transparent text-white" : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg"
   }`;
 }
@@ -208,7 +208,7 @@ export function StoryFeed(cfg: FeedConfig) {
               <option value="newest">{t("sort.newest")}</option>
             </select>
           </label>
-          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm text-fg" title={t("filters.groupHint")}>
+          <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm text-fg" title={t("filters.groupHint")}>
             <input type="checkbox" checked={p.group} onChange={(e) => update({ group: e.target.checked ? null : "0" })} className="size-4 accent-[var(--accent)]" />
             {t("filters.group")}
           </label>
@@ -216,7 +216,7 @@ export function StoryFeed(cfg: FeedConfig) {
             <button
               type="button"
               onClick={() => update({ cat: null, co: null, range: null, from: null, to: null, sort: null, group: null })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted hover:text-fg"
+              className="inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-sm text-muted hover:text-fg"
             >
               <RotateCcw className="size-3.5" aria-hidden />
               {t("filters.reset")}

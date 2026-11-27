@@ -159,7 +159,7 @@ export function SettingsView() {
                         type="button"
                         onClick={() => save({ categoryOrder: move(prefs.categoryOrder, i, -1) })}
                         disabled={i === 0}
-                        className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-30"
+                        className="inline-flex size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-30"
                         aria-label={`${t("settings.moveUp")}: ${label?.[lang] ?? id}`}
                         title={t("settings.moveUp")}
                       >
@@ -169,7 +169,7 @@ export function SettingsView() {
                         type="button"
                         onClick={() => save({ categoryOrder: move(prefs.categoryOrder, i, 1) })}
                         disabled={i === prefs.categoryOrder.length - 1}
-                        className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-30"
+                        className="inline-flex size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-30"
                         aria-label={`${t("settings.moveDown")}: ${label?.[lang] ?? id}`}
                         title={t("settings.moveDown")}
                       >
@@ -181,7 +181,7 @@ export function SettingsView() {
                         aria-checked={enabled}
                         aria-label={label?.[lang] ?? id}
                         onClick={() => save({ interests: toggleIn(prefs.interests, id) })}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${enabled ? "border-transparent brand-gradient" : "border-line-strong bg-surface-2"}`}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors after:absolute after:-inset-2.5 after:content-[''] ${enabled ? "border-transparent brand-gradient" : "border-line-strong bg-surface-2"}`}
                       >
                         <span className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"}`} />
                       </button>

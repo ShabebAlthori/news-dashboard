@@ -11,7 +11,7 @@ export function LanguageToggle({ className = "", compact = false }: { className?
     { value: "ar" as const, label: compact ? "ع" : "عربي", aria: "العربية" },
   ];
   return (
-    <div role="radiogroup" aria-label="Language / اللغة" className={`inline-flex items-center rounded-full border border-line bg-surface p-0.5 ${className}`}>
+    <div role="radiogroup" aria-label="Language / اللغة" className={`inline-flex items-center rounded-full border border-line bg-surface ${className}`}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -21,7 +21,7 @@ export function LanguageToggle({ className = "", compact = false }: { className?
           aria-label={o.aria}
           lang={o.value}
           onClick={() => setLang(o.value)}
-          className={`inline-flex h-8 min-w-10 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
+          className={`inline-flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
             lang === o.value ? "brand-gradient text-white shadow-sm" : "text-muted hover:text-fg"
           }`}
         >
@@ -45,7 +45,7 @@ export function ThemeSwitch({ rail = false }: { rail?: boolean }) {
         onClick={() => setTheme(dark ? "light" : "dark")}
         aria-label={label}
         title={label}
-        className="inline-flex size-10 items-center justify-center rounded-xl border border-line bg-surface text-fg transition-colors hover:bg-surface-2"
+        className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface text-fg transition-colors hover:bg-surface-2"
       >
         <Icon className="size-[18px]" aria-hidden />
       </button>
@@ -61,7 +61,7 @@ export function ThemeSwitch({ rail = false }: { rail?: boolean }) {
         aria-label={t("theme.dark")}
         title={label}
         onClick={() => setTheme(dark ? "light" : "dark")}
-        className={`relative inline-flex h-7 w-[52px] shrink-0 items-center rounded-full transition-colors ${dark ? "brand-gradient" : "bg-surface-3"}`}
+        className={`relative inline-flex h-7 w-[52px] shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-2 after:content-[''] ${dark ? "brand-gradient" : "bg-surface-3"}`}
       >
         <span
           className={`absolute top-1 start-1 size-5 rounded-full bg-white shadow transition-transform duration-200 ${dark ? "ltr:translate-x-6 rtl:-translate-x-6" : ""}`}
@@ -83,7 +83,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={() => setTheme(next)}
-      className={`inline-flex size-9 items-center justify-center rounded-lg border border-line text-fg hover:bg-surface-2 ${className}`}
+      className={`inline-flex size-11 items-center justify-center rounded-lg border border-line text-fg hover:bg-surface-2 ${className}`}
       aria-label={`${t("theme.toggle")}: ${t(`theme.${theme}`)}`}
       title={`${t("theme.toggle")}: ${t(`theme.${theme}`)}`}
     >
@@ -113,7 +113,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           lang={o.lang}
           onClick={() => onChange(o.value)}
-          className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${value === o.value ? "brand-gradient font-semibold text-white shadow-sm" : "text-muted hover:text-fg"}`}
+          className={`min-h-10 rounded-lg px-3.5 py-1.5 text-sm transition-colors ${value === o.value ? "brand-gradient font-semibold text-white shadow-sm" : "text-muted hover:text-fg"}`}
         >
           {o.label}
         </button>
@@ -137,7 +137,7 @@ export function Switch({ checked, onChange, label, hint, id }: { checked: boolea
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${checked ? "border-transparent brand-gradient" : "border-line-strong bg-surface-2"}`}
+        className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors after:absolute after:-inset-2.5 after:content-[''] ${checked ? "border-transparent brand-gradient" : "border-line-strong bg-surface-2"}`}
       >
         <span
           className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"}`}

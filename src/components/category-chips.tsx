@@ -20,7 +20,7 @@ export function CategoryChips({ value, onChange }: { value: string | null; onCha
                 type="button"
                 aria-pressed={on}
                 onClick={() => onChange(c.id === "all" || on ? null : c.id)}
-                className={`inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-all duration-150 ${
+                className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-all duration-150 ${
                   on
                     ? "brand-gradient border-transparent text-white shadow-[0_8px_22px_-10px_rgba(113,59,255,0.8)]"
                     : "border-line bg-surface text-fg hover:-translate-y-px hover:border-line-strong hover:bg-surface-2"

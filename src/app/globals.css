@@ -94,6 +94,9 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --font-sans: var(--font-en);
+  /* Meta text (sources, times, counts) is 13px rather than 12px for legibility. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
   --shadow-card: var(--elev-card);
   --shadow-lift: var(--elev-lift);
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;

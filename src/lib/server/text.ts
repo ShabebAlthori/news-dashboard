@@ -26,6 +26,9 @@ export function htmlToText(html: string | null | undefined): string {
 
 const BOILERPLATE: RegExp[] = [
   /The post .{3,300}? appeared first on .{2,120}?\.?$/i,
+  // Arabic WordPress footers: «نُشر المقال … أولًا على …» and «التدوينة … ظهرت أولاً على …»
+  /(?:نُ?شِ?ر|نشر) المقال[\s\S]{3,400}?أو(?:ل|لً|لا|لاً|لًا)ا? على[^\n]{2,120}?\s*\.?\s*$/u,
+  /(?:التدوينة\s+[\s\S]{3,400}?)?ظهرت أو(?:ل|لا|لاً|لًا)ا? على[^\n]{2,120}?\s*\.?\s*$/u,
   /This article originally appeared on .{2,120}? at https?:\/\/\S+\.?$/i,
   /\bContinue reading\b.*$/i,
   /\bRead more\b\s*(»|›|\.\.\.|…)?\s*$/i,
@@ -35,7 +38,7 @@ const BOILERPLATE: RegExp[] = [
   /\bSee full article\b.*$/i,
 ];
 
-function stripBoilerplate(s: string): string {
+export function stripBoilerplate(s: string): string {
   let out = s;
   for (const re of BOILERPLATE) out = out.replace(re, "").trim();
   return out;
