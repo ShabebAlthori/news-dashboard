@@ -76,13 +76,15 @@ export function ReportArt({ className = "" }: { className?: string }) {
   );
 }
 
-export function useReport(id?: number | null) {
-  return useSWR<ReportResponse>(id ? `/api/report?id=${id}` : "/api/report", { refreshInterval: 15 * 60_000 });
+/** `meta`: only the latest period and the next date (for the dashboard panel). */
+export function useReport(id?: number | null, meta = false) {
+  return useSWR<ReportResponse>(id ? `/api/report?id=${id}` : meta ? "/api/report?meta=1" : "/api/report", { refreshInterval: 15 * 60_000 });
 }
 
 export function ReportPanel() {
   const { t, lang } = useUi();
-  const { data } = useReport();
+  const { data } = useReport(null, true);
+  const hasReport = !!(data?.latest || data?.archive.length);
   return (
     <section
       aria-labelledby="report-title"
@@ -102,12 +104,12 @@ export function ReportPanel() {
           className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/20"
         >
           <CalendarDays className="size-4" aria-hidden />
-          {data?.latest ? t("report.view") : t("report.every")}
+          {hasReport ? t("report.view") : t("report.every")}
         </Link>
         <p className="text-xs text-white/75">
           {t("report.every")} · {data ? t("report.next", { date: formatDay(data.nextAt, lang) }) : "…"}
         </p>
-        {data && !data.latest && <p className="text-xs text-white/75">{t("report.none")}</p>}
+        {data && !hasReport && <p className="text-xs text-white/75">{t("report.none")}</p>}
       </div>
     </section>
   );

@@ -4,7 +4,7 @@ import { normalizePrefs } from "./prefs";
 import { matchesSearch, searchTerms } from "./search";
 import { finalScore, isBreaking, relevanceFactor, tier, toRelevancePrefs, type RelevancePrefs } from "./scoring";
 import { COMPANIES, FILTER_IDS, groupOfTopic, PRIORITY_IDS, subjectTopics, topicsOf, TRENDING_COMPANY_IDS, type Section } from "./taxonomy";
-import type { CategoryPulse, CompanyPulse, DashboardResponse, Prefs, SnapshotStory, StoriesResponse, Story } from "./types";
+import type { CategoryPulse, CompanyPulse, DashboardResponse, HomeFile, PackedDashboard, Prefs, RadarItem, Snapshot, SnapshotStory, StoriesResponse, Story } from "./types";
 
 const HOUR = 3_600_000;
 
@@ -168,6 +168,8 @@ export function queryStories(stories: SnapshotStory[], q: StaticQuery, rawCtx: R
 export interface DashboardOptions {
   /** Filter every section to one priority category (or topic); null/"all" = everything. */
   category?: string | null;
+  /** Candidates for "You might have missed" (more when read stories are filtered later, in the browser). */
+  missedCount?: number;
 }
 
 export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, opts: DashboardOptions = {}): DashboardResponse {
@@ -276,7 +278,7 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
 
   const older = rank(stories, { ...scope, from: now - 96 * HOUR, to: now - 10 * HOUR }, ctx);
   sortRanked(older, "importance");
-  const missed = pick(older.filter((c) => !c.read), 6, 50);
+  const missed = pick(older.filter((c) => !c.read), opts.missedCount ?? 6, 50);
 
   const pulse = (ids: string[]): CompanyPulse[] =>
     ids
@@ -325,3 +327,103 @@ export function countCompanies(stories: SnapshotStory[], from: number, rawCtx: R
   for (const s of rank(stories, { from }, ctx)) for (const id of s.companies) counts[id] = (counts[id] ?? 0) + 1;
   return counts;
 }
+
+/** True when the reader's preferences equal the defaults (the published home dashboard applies). */
+export function isDefaultPrefs(prefs: Prefs, defaults: Prefs): boolean {
+  const a = normalizePrefs(prefs);
+  const b = normalizePrefs(defaults);
+  const key = (p: Prefs) =>
+    JSON.stringify([p.categoryOrder, [...p.interests].sort(), [...p.followedCompanies].sort(), p.showReviews, p.includeTechPolicy]);
+  return key(a) === key(b);
+}
+
+/**
+ * Mark saved and read stories in a dashboard computed without reader state (the published home
+ * dashboard), and drop read stories from "You might have missed".
+ */
+export function withReaderState(d: DashboardResponse, saved: Set<string>, read: Set<string>, missedCount = 6): DashboardResponse {
+  const mark = (s: Story): Story => {
+    const urls = urlsOf(s);
+    return { ...s, saved: urls.some((u) => saved.has(u)), read: urls.some((u) => read.has(u)) };
+  };
+  const list = (xs: Story[]) => xs.map(mark);
+  return {
+    ...d,
+    top: list(d.top),
+    briefing: list(d.briefing),
+    latest: list(d.latest),
+    tech: list(d.tech),
+    gaming: list(d.gaming),
+    announcements: list(d.announcements),
+    missed: list(d.missed).filter((s) => !s.read).slice(0, missedCount),
+    byCategory: d.byCategory.map((c) => ({ ...c, stories: list(c.stories) })),
+    trending: d.trending.map((c) => ({ ...c, top: c.top ? mark(c.top) : null })),
+    companies: d.companies.map((c) => ({ ...c, top: c.top ? mark(c.top) : null })),
+  };
+}
+
+/** Build the web edition's home.json from the full snapshot and the panels' data. */
+export function buildHomeFile(
+  snapshot: Pick<Snapshot, "stories" | "generatedAt" | "defaultPrefs">,
+  radar: { lastSuccessAt: string | null; items: RadarItem[] },
+  latestReport: { id: number; periodStart: string; periodEnd: string } | null,
+): HomeFile {
+  const ref = Date.parse(snapshot.generatedAt);
+  const ctx: RankContext = { prefs: normalizePrefs(snapshot.defaultPrefs), saved: new Map(), read: new Set(), now: ref, generatedAt: snapshot.generatedAt, asOf: ref };
+  const alerts = queryStories(snapshot.stories, { from: ref - 24 * HOUR, sort: "importance", limit: 40 }, ctx).stories.filter((s) => s.breaking || s.tier === "major").slice(0, 8);
+  return {
+    version: 1,
+    generatedAt: snapshot.generatedAt,
+    defaultPrefs: snapshot.defaultPrefs,
+    // More "missed" candidates than shown: the browser drops the ones this reader has opened.
+    dashboard: packDashboard(buildDashboard(snapshot.stories, ctx, { missedCount: 16 })),
+    alerts,
+    // The radar panel shows the newest item of each type; a few per type is plenty.
+    radar: { lastSuccessAt: radar.lastSuccessAt, items: (["release", "research", "update", "repository"] as const).flatMap((t) => radar.items.filter((i) => i.type === t).slice(0, 3)) },
+    report: { latest: latestReport },
+  };
+}
+
+/** Store each story once; the dashboard never shows coverage excerpts, so they are dropped. */
+export function packDashboard(d: DashboardResponse): PackedDashboard {
+  const stories = new Map<number, Story>();
+  const ref = (s: Story) => {
+    if (!stories.has(s.id)) stories.set(s.id, { ...s, coverage: s.coverage.map(({ excerpt: _e, ...c }) => (void _e, c)) });
+    return s.id;
+  };
+  const ids = (xs: Story[]) => xs.map(ref);
+  return {
+    top: ids(d.top),
+    briefing: ids(d.briefing),
+    latest: ids(d.latest),
+    tech: ids(d.tech),
+    gaming: ids(d.gaming),
+    announcements: ids(d.announcements),
+    missed: ids(d.missed),
+    byCategory: d.byCategory.map((c) => ({ categoryId: c.categoryId, count: c.count, stories: ids(c.stories) })),
+    trending: d.trending.map((c) => ({ companyId: c.companyId, count: c.count, top: c.top ? ref(c.top) : null })),
+    companies: d.companies.map((c) => ({ companyId: c.companyId, count: c.count, top: c.top ? ref(c.top) : null })),
+    rest: { category: d.category, briefingFacts: d.briefingFacts, generatedAt: d.generatedAt },
+    stories: [...stories.values()],
+  };
+}
+
+export function unpackDashboard(p: PackedDashboard): DashboardResponse {
+  const byId = new Map(p.stories.map((s) => [s.id, s]));
+  const get = (id: number) => byId.get(id)!;
+  const list = (xs: number[]) => xs.map(get).filter(Boolean);
+  return {
+    ...p.rest,
+    top: list(p.top),
+    briefing: list(p.briefing),
+    latest: list(p.latest),
+    tech: list(p.tech),
+    gaming: list(p.gaming),
+    announcements: list(p.announcements),
+    missed: list(p.missed),
+    byCategory: p.byCategory.map((c) => ({ categoryId: c.categoryId, count: c.count, stories: list(c.stories) })),
+    trending: p.trending.map((c) => ({ companyId: c.companyId, count: c.count, top: c.top != null ? (byId.get(c.top) ?? null) : null })),
+    companies: p.companies.map((c) => ({ companyId: c.companyId, count: c.count, top: c.top != null ? (byId.get(c.top) ?? null) : null })),
+  };
+}
+

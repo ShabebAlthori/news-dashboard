@@ -21,8 +21,9 @@ const TYPE_COLORS: Record<RadarType, string> = {
 };
 const TYPES: RadarType[] = ["release", "research", "update", "repository"];
 
-export function useRadar() {
-  return useSWR<RadarResponse>("/api/radar", { refreshInterval: 5 * 60_000 });
+/** `panel`: only what the dashboard panel shows (in the web edition, from the small home file). */
+export function useRadar(panel = false) {
+  return useSWR<RadarResponse>(panel ? "/api/radar?panel=1" : "/api/radar", { refreshInterval: 5 * 60_000 });
 }
 
 export function RadarTypeBadge({ type }: { type: RadarType }) {
@@ -113,7 +114,7 @@ function panelPicks(items: RadarItem[], n: number): RadarItem[] {
 
 export function RadarPanel() {
   const { t } = useUi();
-  const { data, error } = useRadar();
+  const { data, error } = useRadar(true);
   const picks = data ? panelPicks(data.items, 3) : [];
   return (
     <section className="card p-5" aria-labelledby="radar-title">

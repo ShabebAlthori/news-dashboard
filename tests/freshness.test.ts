@@ -80,3 +80,62 @@ describe("dashboard windows follow the snapshot time", () => {
     expect(clockOnly.briefingFacts.stories).toBeLessThan(10);
   });
 });
+
+describe("home.json", () => {
+  it("packs each story once and restores the same dashboard", async () => {
+    const { buildHomeFile, unpackDashboard, buildDashboard, withReaderState, isDefaultPrefs } = await import("@/lib/shared/rank");
+    const generatedAt = new Date(now).toISOString();
+    const stories = Array.from({ length: 30 }, (_, i) => {
+      const t = now - (i + 1) * 2 * HOUR;
+      return {
+        id: i + 1,
+        leadArticleId: i + 1,
+        title: { original: `Story ${i + 1}`, en: `Story ${i + 1}`, ar: null },
+        summary: { en: "Summary.", ar: null, origin: "feed", aiModel: null },
+        url: `https://e.com/${i + 1}`,
+        lang: "en",
+        source: { id: "verge", name: "The Verge", official: false },
+        publishedAt: new Date(t).toISOString(),
+        fetchedAt: new Date(t).toISOString(),
+        sections: ["tech"],
+        categories: [i % 2 ? "ai" : "data"],
+        companies: i % 3 ? [] : ["nvidia"],
+        eventType: "general",
+        rumor: false,
+        importance: 50,
+        tier: "standard",
+        breaking: false,
+        breakdown: { significance: 0.5, coverage: 0, credibility: 0.9, impact: 0.3, relevance: 0, penalties: 0 },
+        sourceCount: 1,
+        coverage: [{ articleId: 900 + i, sourceId: "ars", sourceName: "Ars", title: "x", url: `https://ars.com/${i}`, publishedAt: null, fetchedAt: generatedAt, official: false, excerpt: "long excerpt" }],
+        imageUrl: null,
+        saved: false,
+        read: false,
+        sortTime: t,
+        lastActivity: t,
+        firstPublishedAt: t,
+        significance: 0.5,
+        baseScore: 40 + (i % 7),
+        policy: false,
+      } as SnapshotStory;
+    });
+    const defaults = { ...DEFAULT_PREFS };
+    const home = buildHomeFile({ stories, generatedAt, defaultPrefs: defaults }, { lastSuccessAt: null, items: [] }, null);
+    const unpacked = unpackDashboard(home.dashboard!);
+    const direct = buildDashboard(stories, { prefs: defaults, saved: new Map(), read: new Set(), now, generatedAt, asOf: now }, { missedCount: 16 });
+    expect(unpacked.top.map((s) => s.id)).toEqual(direct.top.map((s) => s.id));
+    expect(unpacked.byCategory.map((c) => c.stories.map((s) => s.id))).toEqual(direct.byCategory.map((c) => c.stories.map((s) => s.id)));
+    expect(new Set(home.dashboard!.stories.map((s) => s.id)).size).toBe(home.dashboard!.stories.length);
+    expect(home.dashboard!.stories.every((s) => s.coverage.every((c) => !("excerpt" in c)))).toBe(true);
+
+    // The browser adds saved/read state and drops opened stories from "missed".
+    const missed = unpacked.missed;
+    const withState = withReaderState(unpacked, new Set([unpacked.top[0].url]), new Set([missed[0]?.url].filter(Boolean) as string[]));
+    expect(withState.top[0].saved).toBe(true);
+    expect(withState.missed.some((s) => s.id === missed[0]?.id)).toBe(false);
+    expect(withState.missed.length).toBeLessThanOrEqual(6);
+
+    expect(isDefaultPrefs({ ...DEFAULT_PREFS }, defaults)).toBe(true);
+    expect(isDefaultPrefs({ ...DEFAULT_PREFS, followedCompanies: ["nvidia"] }, defaults)).toBe(false);
+  });
+});

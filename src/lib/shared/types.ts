@@ -268,6 +268,38 @@ export interface ReportResponse {
   generatedAt: string;
 }
 
+/**
+ * Web edition: the small file the home page loads instead of the full snapshot — the dashboard
+ * computed with the default preferences (the browser adds saved/read state), the day's major
+ * alerts, and the few Data Radar items and report dates the panels need.
+ */
+/** A dashboard with every story stored once (sections hold story ids). */
+export interface PackedDashboard {
+  stories: Story[];
+  top: number[];
+  briefing: number[];
+  latest: number[];
+  tech: number[];
+  gaming: number[];
+  announcements: number[];
+  missed: number[];
+  byCategory: { categoryId: string; count: number; stories: number[] }[];
+  trending: { companyId: string; count: number; top: number | null }[];
+  companies: { companyId: string; count: number; top: number | null }[];
+  rest: Pick<DashboardResponse, "category" | "briefingFacts" | "generatedAt">;
+}
+
+export interface HomeFile {
+  version: 1;
+  generatedAt: string;
+  defaultPrefs: Prefs;
+  dashboard: PackedDashboard | null;
+  /** Breaking and major stories of the last 24 hours (notifications menu). */
+  alerts: Story[];
+  radar: { lastSuccessAt: string | null; items: RadarItem[] };
+  report: { latest: { id: number; periodStart: string; periodEnd: string } | null };
+}
+
 export interface Snapshot {
   version: 1;
   generatedAt: string;

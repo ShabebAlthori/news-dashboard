@@ -92,6 +92,7 @@ export function StoryImage({ story, category, className = "", eager = false }: {
       src={story.imageUrl!}
       alt=""
       loading={eager ? "eager" : "lazy"}
+      fetchPriority={eager ? "high" : undefined}
       decoding="async"
       referrerPolicy="no-referrer"
       onError={() => setFailedUrl(story.imageUrl)}

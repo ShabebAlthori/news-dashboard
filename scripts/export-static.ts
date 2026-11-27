@@ -3,6 +3,7 @@
 //   out/data/status.json    — last update time, source health and AI status (polled by the page)
 //   out/data/radar.json     — Data Radar items (releases, research, updates) and radar source health
 //   out/data/report.json    — the latest Weekly Tech Reports
+//   out/data/home.json      — the small subset the home page needs (loaded instead of snapshot.json)
 // Usage: npm run export:static [-- <output dir>] [--no-refresh]
 import fs from "node:fs";
 import path from "node:path";
@@ -14,6 +15,7 @@ import { getRadar } from "../src/lib/server/radar";
 import { listReports, maybeGenerateWeeklyReport } from "../src/lib/server/report";
 import { defaultPrefs } from "../src/lib/server/settings";
 import { getSourcesHealth, getStatus } from "../src/lib/server/status";
+import { buildHomeFile } from "../src/lib/shared/rank";
 import type { Snapshot } from "../src/lib/shared/types";
 
 async function main() {
@@ -53,12 +55,18 @@ async function main() {
 
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "snapshot.json"), JSON.stringify(snapshot));
-  fs.writeFileSync(path.join(outDir, "radar.json"), JSON.stringify({ ...getRadar(), generatedAt }));
-  fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ generatedAt, reports: listReports(6) }));
+  const radar = getRadar();
+  const reports = listReports(6);
+  fs.writeFileSync(path.join(outDir, "radar.json"), JSON.stringify({ ...radar, generatedAt }));
+  fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ generatedAt, reports }));
+  // The home page's own small file: the dashboard with the default preferences (the browser adds
+  // the reader's saved/read state, or rebuilds from snapshot.json when preferences differ).
+  const home = buildHomeFile({ ...snapshot, generatedAt }, radar, reports[0] ? { id: reports[0].id, periodStart: reports[0].periodStart, periodEnd: reports[0].periodEnd } : null);
+  fs.writeFileSync(path.join(outDir, "home.json"), JSON.stringify(home));
   // status.json last: the page polls it and then loads the other files at this version.
   fs.writeFileSync(path.join(outDir, "status.json"), JSON.stringify({ generatedAt, status, sources }));
-  const kb = Math.round(fs.statSync(path.join(outDir, "snapshot.json")).size / 1024);
-  console.log(`Wrote ${stories.length} stories (${kb} KB) to ${outDir}`);
+  const kb = (f: string) => Math.round(fs.statSync(path.join(outDir, f)).size / 1024);
+  console.log(`Wrote ${stories.length} stories (${kb("snapshot.json")} KB; home.json ${kb("home.json")} KB) to ${outDir}`);
   if (!status.lastSuccessAt && stories.length === 0) process.exit(1);
 }
 

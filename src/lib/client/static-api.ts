@@ -3,10 +3,10 @@
 // Data layer of the static web edition. The site ships two JSON files, refreshed by
 // GitHub Actions: data/status.json (small, polled) and data/snapshot.json (all stories).
 // Reader state — saved stories, read history and settings — stays in this browser.
-import { buildDashboard, countCompanies, queryStories, type RankContext } from "@/lib/shared/rank";
+import { buildDashboard, countCompanies, isDefaultPrefs, queryStories, unpackDashboard, withReaderState, type RankContext } from "@/lib/shared/rank";
 import type { Section } from "@/lib/shared/taxonomy";
 import { nextReportAt } from "@/lib/shared/schedule";
-import type { Prefs, RadarResponse, ReportResponse, Snapshot, SnapshotStory, SourceHealth, StatusResponse, Story, WeeklyReport } from "@/lib/shared/types";
+import type { HomeFile, Prefs, RadarResponse, ReportResponse, Snapshot, SnapshotStory, SourceHealth, StatusResponse, StoriesResponse, Story, WeeklyReport } from "@/lib/shared/types";
 import { normalizePrefs } from "@/lib/shared/prefs";
 import { BASE_PATH } from "./mode";
 
@@ -47,11 +47,25 @@ async function getJson<T>(path: string, version: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function loadStatusFile(): Promise<StatusFile> {
-  // Bust caches every 30 seconds (GitHub Pages caches files for up to 10 minutes).
-  const file = await getJson<StatusFile>("status.json", String(Math.floor(Date.now() / 30_000)));
-  latestGeneratedAt = file.generatedAt;
-  return file;
+let statusRequest: { version: string; promise: Promise<StatusFile> } | null = null;
+
+/**
+ * status.json, shared by every caller: concurrent requests (status poll, radar, report…) use one
+ * fetch, and the result is reused for 30 seconds (GitHub Pages caches files for up to 10 minutes).
+ */
+export function loadStatusFile(): Promise<StatusFile> {
+  const version = String(Math.floor(Date.now() / 30_000));
+  if (statusRequest?.version !== version) {
+    const promise = getJson<StatusFile>("status.json", version).then((file) => {
+      latestGeneratedAt = file.generatedAt;
+      return file;
+    });
+    promise.catch(() => {
+      if (statusRequest?.promise === promise) statusRequest = null;
+    });
+    statusRequest = { version, promise };
+  }
+  return statusRequest.promise;
 }
 
 async function getSnapshot(): Promise<Snapshot> {
@@ -91,6 +105,16 @@ async function getDataFile<T>(name: string): Promise<T> {
   return promise;
 }
 
+/** The home page's slim data file; the full snapshot is loaded only by pages that need it. */
+/** Without home.json (e.g. a site published before it existed): defaults from the snapshot, no precomputed parts. */
+function homeFromSnapshot(s: Snapshot): HomeFile {
+  return { version: 1, generatedAt: s.generatedAt, defaultPrefs: s.defaultPrefs, dashboard: null, alerts: [], radar: { lastSuccessAt: null, items: [] }, report: { latest: null } };
+}
+
+function getHome(): Promise<HomeFile> {
+  return getDataFile<HomeFile>("home.json").catch(async () => homeFromSnapshot(await getSnapshot()));
+}
+
 export function getPrefs(defaults: Prefs): Prefs {
   // Settings saved before the priority categories existed are migrated, not reset.
   return normalizePrefs({ ...defaults, categoryOrder: [], ...readStorage<Partial<Prefs>>(KEYS.prefs, {}) } as Prefs);
@@ -128,16 +152,41 @@ export async function staticFetch<T>(key: string): Promise<T> {
     case "/api/sources":
       return (await loadStatusFile()).sources as T;
     case "/api/settings": {
-      const snap = await getSnapshot();
-      return getPrefs(snap.defaultPrefs) as T;
+      const home = await getHome();
+      return getPrefs(home.defaultPrefs) as T;
     }
     case "/api/dashboard": {
+      // Default preferences and no category filter: the precomputed dashboard in home.json,
+      // with this browser's saved/read state. Anything else is computed from the full snapshot.
+      const category = p.get("category");
+      if (!category && !snapshot) {
+        const home = await getHome();
+        if (home.dashboard && isDefaultPrefs(getPrefs(home.defaultPrefs), home.defaultPrefs)) {
+          return withReaderState(unpackDashboard(home.dashboard), new Set(savedMap().keys()), readSet()) as T;
+        }
+      }
       const { snap, ctx } = await context();
-      return buildDashboard(snap.stories, ctx, { category: p.get("category") }) as T;
+      return buildDashboard(snap.stories, ctx, { category }) as T;
     }
-    case "/api/radar":
+    case "/api/radar": {
+      if (p.get("panel") === "1" && !dataFiles.has("radar.json")) {
+        const home = await getHome();
+        if (home.dashboard) return { items: home.radar.items, lastSuccessAt: home.radar.lastSuccessAt, sources: [], generatedAt: home.generatedAt } satisfies RadarResponse as T;
+      }
       return (await getDataFile<RadarResponse>("radar.json")) as T;
+    }
     case "/api/report": {
+      if (p.get("meta") === "1" && !dataFiles.has("report.json")) {
+        const home = await getHome();
+        if (home.dashboard) {
+          return {
+            latest: null,
+            archive: home.report.latest ? [home.report.latest] : [],
+            nextAt: new Date(nextReportAt(Date.now())).toISOString(),
+            generatedAt: home.generatedAt,
+          } satisfies ReportResponse as T;
+        }
+      }
       const file = await getDataFile<ReportFile>("report.json");
       const id = num(p.get("id"));
       const latest = (id ? file.reports.find((r) => r.id === id) : file.reports[0]) ?? null;
@@ -153,6 +202,16 @@ export async function staticFetch<T>(key: string): Promise<T> {
       return countCompanies(snap.stories, num(p.get("from")) ?? Date.now() - 48 * 3_600_000, ctx) as T;
     }
     case "/api/stories": {
+      // pool=home: the notifications menu uses the precomputed alerts, never the full snapshot.
+      if (p.get("pool") === "home" && !snapshot) {
+        const home = await getHome();
+        if (home.dashboard) {
+          const read = readSet();
+          const saved = new Set(savedMap().keys());
+          const stories = home.alerts.map((s) => ({ ...s, saved: saved.has(s.url), read: read.has(s.url) }));
+          return { stories, total: stories.length, nextCursor: null, generatedAt: home.generatedAt } satisfies StoriesResponse as T;
+        }
+      }
       const { snap, ctx } = await context();
       return queryStories(
         snap.stories,
@@ -210,8 +269,8 @@ export function addRead(url: string) {
 }
 
 export async function setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
-  const snap = await getSnapshot();
-  const next = normalizePrefs({ ...getPrefs(snap.defaultPrefs), ...patch });
+  const home = await getHome();
+  const next = normalizePrefs({ ...getPrefs(home.defaultPrefs), ...patch });
   writeStorage(KEYS.prefs, next);
   return next;
 }

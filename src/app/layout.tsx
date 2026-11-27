@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import "@fontsource-variable/inter";
-import "@fontsource/ibm-plex-sans-arabic/400.css";
-import "@fontsource/ibm-plex-sans-arabic/500.css";
-import "@fontsource/ibm-plex-sans-arabic/600.css";
-import "@fontsource/ibm-plex-sans-arabic/700.css";
+// Arabic glyphs only (Latin text, including inside Arabic, uses Inter), in the three weights the
+// UI uses; medium (500) falls back to regular. Both packages use font-display: swap.
+import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
+import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
+import "@fontsource/ibm-plex-sans-arabic/arabic-700.css";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { Providers, type ThemePref } from "@/components/providers";

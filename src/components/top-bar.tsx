@@ -166,7 +166,7 @@ export function Notifications() {
   const { t, lang } = useUi();
   const now = useNow(300_000);
   const from = Math.floor(now / 300_000) * 300_000 - 24 * 3_600_000;
-  const { data } = useSWR<StoriesResponse>(`/api/stories?from=${from}&sort=importance&limit=24`, { refreshInterval: 300_000 });
+  const { data } = useSWR<StoriesResponse>(`/api/stories?from=${from}&sort=importance&limit=24&pool=home`, { refreshInterval: 300_000 });
   const seen = useSyncExternalStore(subscribeSeen, readSeen, () => Number.POSITIVE_INFINITY);
   const [seenWhenOpened, setSeenWhenOpened] = useState<number | null>(null);
   const alerts = (data?.stories ?? [])
