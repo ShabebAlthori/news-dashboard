@@ -236,10 +236,13 @@ export const COMPANIES: CompanyDef[] = [
   { id: "databricks", en: "Databricks", ar: "داتابريكس", tier: 2, core: true },
   { id: "snowflake", en: "Snowflake", ar: "سنوفليك", tier: 2, core: true },
   { id: "palantir", en: "Palantir", ar: "بالانتير", tier: 2, core: true },
+  // Enterprise technology
+  { id: "oracle", en: "Oracle", ar: "أوراكل", tier: 1, core: true },
+  { id: "ibm", en: "IBM", ar: "آي بي إم", tier: 1, core: true },
 ];
 
-/** Companies shown in Trending Companies, in this order when activity ties. */
-export const TRENDING_COMPANY_IDS = ["nvidia", "microsoft", "google", "apple", "amazon", "amd", "intel", "openai", "anthropic", "databricks", "snowflake", "palantir"];
+/** Companies in Company Watch (always listed), in this order when activity ties. */
+export const TRENDING_COMPANY_IDS = ["microsoft", "google", "nvidia", "amd", "intel", "apple", "amazon", "openai", "anthropic", "databricks", "snowflake", "palantir", "oracle", "ibm"];
 
 export const COMPANY_IDS = COMPANIES.map((c) => c.id);
 

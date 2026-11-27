@@ -3,7 +3,8 @@
 // Every source is a public feed or API offered by the project itself for this purpose:
 // - Project news/blog feeds (PostgreSQL, Apache Kafka, Apache Airflow, DuckDB, Microsoft Fabric, Power BI).
 // - PyPI's official per-project release feeds (pypi.org/rss/project/<name>/releases.xml) for projects
-//   that publish releases there (Apache Spark via PySpark, dbt Core, Polars, PyIceberg).
+//   that publish releases there (Apache Spark via PySpark, dbt Core, Polars, PyIceberg, the
+//   Databricks SDK for Python and Snowflake's Snowpark for Python).
 // - arXiv's official RSS service for new database research (cs.DB).
 // - The GitHub REST API (search) for notable new data repositories — only when GITHUB_TOKEN is set,
 //   e.g. in GitHub Actions. This is GitHub's documented API, used within its rate limits.
@@ -50,6 +51,8 @@ export const RADAR_SOURCES: RadarSourceDef[] = [
   { id: "dbt", platform: "dbt", homepage: "https://pypi.org/project/dbt-core/", url: "https://pypi.org/rss/project/dbt-core/releases.xml", kind: "pypi", everyMinutes: 120, type: "release", releaseName: "dbt Core" },
   { id: "polars", platform: "Polars", homepage: "https://pypi.org/project/polars/", url: "https://pypi.org/rss/project/polars/releases.xml", kind: "pypi", everyMinutes: 120, type: "release", releaseName: "Polars" },
   { id: "iceberg", platform: "Apache Iceberg", homepage: "https://py.iceberg.apache.org/", url: "https://pypi.org/rss/project/pyiceberg/releases.xml", kind: "pypi", everyMinutes: 120, type: "release", releaseName: "PyIceberg" },
+  { id: "databricks", platform: "Databricks", homepage: "https://pypi.org/project/databricks-sdk/", url: "https://pypi.org/rss/project/databricks-sdk/releases.xml", kind: "pypi", everyMinutes: 120, type: "release", releaseName: "Databricks SDK for Python" },
+  { id: "snowflake", platform: "Snowflake", homepage: "https://pypi.org/project/snowflake-snowpark-python/", url: "https://pypi.org/rss/project/snowflake-snowpark-python/releases.xml", kind: "pypi", everyMinutes: 120, type: "release", releaseName: "Snowpark for Python" },
   { id: "arxiv-db", platform: "arXiv", homepage: "https://arxiv.org/list/cs.DB/recent", url: "https://rss.arxiv.org/rss/cs.DB", kind: "feed", everyMinutes: 360, type: "research" },
   { id: "github-data", platform: "GitHub", homepage: "https://github.com/topics/data-engineering", url: "https://api.github.com/search/repositories", kind: "github-search", everyMinutes: 360, type: "repository", query: "topic:data-engineering" },
   { id: "github-db", platform: "GitHub", homepage: "https://github.com/topics/database", url: "https://api.github.com/search/repositories", kind: "github-search", everyMinutes: 360, type: "repository", query: "topic:database" },

@@ -88,6 +88,14 @@ describe("company subjects", () => {
     expect(detectCompanies("Apple and Google settle search deal case", "").all.sort()).toEqual(["apple", "google"]);
   });
 
+  it("tracks Oracle and IBM without tagging every oracle", () => {
+    expect(detectCompanies("Oracle signs a cloud deal worth billions", "").all).toEqual(["oracle"]);
+    expect(detectCompanies("IBM unveils a new quantum processor", "").all).toEqual(["ibm"]);
+    expect(detectCompanies("أوراكل توقع صفقة سحابية جديدة", "").all).toEqual(["oracle"]);
+    expect(detectCompanies("آي بي إم تكشف عن معالج كمي جديد", "").all).toEqual(["ibm"]);
+    expect(detectCompanies("A price oracle bug drained a DeFi protocol", "").all).toEqual([]);
+  });
+
   it("weights mentions in the lead paragraph", () => {
     expect(detectCompanies("Chipmakers rally after earnings", "Nvidia said revenue rose. Nvidia expects more.").all).toEqual(["nvidia"]);
     expect(detectCompanies("New phone leaks", "It runs Android, like most phones.").all).toEqual([]);

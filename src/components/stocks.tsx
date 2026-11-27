@@ -69,6 +69,35 @@ function Change({ q, muted = false, className = "" }: { q: StockQuote; muted?: b
   );
 }
 
+/** One company's delayed quote (company pages). Nothing is shown without a published quote. */
+export function QuoteLine({ companyId }: { companyId: string }) {
+  const { t } = useUi();
+  const spoken = useSpokenChange();
+  const symbol = COMPANY_TICKERS[companyId];
+  const { data } = useStocks();
+  const q = symbol ? data?.quotes.find((x) => x.symbol === symbol) : undefined;
+  if (!symbol) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <span className="rounded border border-line px-1.5 font-mono text-xs leading-5 text-muted" dir="ltr">
+        {symbol}
+      </span>
+      {q && (
+        <>
+          <span dir="ltr" className="font-mono text-[13.5px] tabular-nums text-fg">
+            {formatPrice(q.price, q.currency)}
+          </span>
+          <span aria-hidden>
+            <Change q={q} />
+          </span>
+          <span className="sr-only">{spoken(q)}</span>
+          <span className="text-xs text-subtle">{q.marketState === "closed" ? t("stocks.closed") : t("stocks.delayed")}</span>
+        </>
+      )}
+    </p>
+  );
+}
+
 /** Market state, age and attribution lines shared by the box and the page. Each line is one row high. */
 function StocksMeta({ file, quotes }: { file: StocksFile | undefined; quotes: StockQuote[] | null }) {
   const { t, lang } = useUi();

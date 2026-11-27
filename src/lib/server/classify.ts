@@ -299,6 +299,9 @@ const COMPANY_PATTERNS: CompanyPattern[] = [
   // "snowflake" is also an ordinary word: only the capitalised company name counts.
   { id: "snowflake", patterns: [/\bSnowflake\b(?! (ID|IDs|schema|pattern)\b)/, /\bSridhar Ramaswamy\b/i, ar("سنوفليك|سنو فليك")], weak: [/\bSnowpark\b/] },
   { id: "palantir", patterns: [/\bPalantir\b/i, /\bAlex Karp\b/i, ar("بالانتير|بلانتير")] },
+  // "Oracle" capitalised only (a price or data "oracle" is not the company).
+  { id: "oracle", patterns: [/\bOracle\b(?! (of|Bone|Cards?)\b)/, /\bLarry Ellison\b/i, /\bSafra Catz\b/i, ar("أوراكل|اوراكل")], weak: [/\bOracle Cloud\b/, /\bOCI\b/, /\bNetSuite\b/, /\bCerner\b/] },
+  { id: "ibm", patterns: [/\bIBM\b/, /\bArvind Krishna\b/i, ar("آي بي إم|آي\.بي\.إم")], weak: [/\bRed Hat\b/, /\bwatsonx\b/i, /\bHashiCorp\b/] },
 ];
 
 const LEAD_CHARS = 400;

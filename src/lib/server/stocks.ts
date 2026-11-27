@@ -3,7 +3,7 @@
 // Source: Finnhub (https://finnhub.io) — a documented market-data API with a free key.
 // The key (FINNHUB_API_KEY) is a server/CI secret: it is sent in a request header, never put in
 // a URL, a log line or any file the browser receives. Free plan: 60 API calls per minute; one
-// refresh makes one market-status call plus one quote call per ticker (≈17 calls).
+// refresh makes one market-status call plus one quote call per ticker (≈19 calls).
 //
 // The file is written only with real quotes: a ticker whose fetch fails keeps its last good
 // quote (with its own, older fetch time), and when nothing could be fetched the previous file

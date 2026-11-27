@@ -27,6 +27,8 @@ export const COMPANY_TICKERS: Record<string, string> = {
   arm: "ARM",
   snowflake: "SNOW",
   palantir: "PLTR",
+  oracle: "ORCL",
+  ibm: "IBM",
 };
 
 /** Every ticker the pipeline fetches: the home box first, then the followed-company tickers. */

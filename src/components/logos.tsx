@@ -52,7 +52,8 @@ export function CompanyLogo({ id, size = 36, className = "" }: { id: string; siz
 /** Logo of a Data Radar platform; generic icons where the project offers no permitted mark. */
 export function PlatformLogo({ sourceId, platform, size = 40 }: { sourceId: string; platform: string; size?: number }) {
   const key = sourceId.startsWith("github-") ? "p:github" : `p:${sourceId}`;
-  const mark = BRAND_MARKS[key];
+  // Platforms that are also tracked companies (Databricks, Snowflake) use the company mark.
+  const mark = BRAND_MARKS[key] ?? BRAND_MARKS[sourceId];
   if (mark) return <MarkTile path={mark.path} size={size} />;
   const Icon = sourceId === "powerbi" ? ChartColumnBig : sourceId === "fabric" ? Layers : null;
   if (Icon) {

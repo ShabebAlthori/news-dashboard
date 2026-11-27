@@ -260,16 +260,17 @@ function clusterNewArticles(db: Database.Database, newIds: number[]): Set<number
 // ---------------------------------------------------------------------------
 // One-time taxonomy upgrade for stories already in the database (additive only).
 
-const TAXONOMY_VERSION = 3;
-/** Topics added in taxonomy v2 and companies added in v3: existing articles are re-tagged once. */
+const TAXONOMY_VERSION = 4;
+/** Topics added in taxonomy v2 and companies added in v3 and v4: existing articles are re-tagged once. */
 const NEW_TOPICS = ["data", "robotics", "saudi"];
-const NEW_COMPANIES = ["databricks", "snowflake", "palantir"];
+const NEW_COMPANIES_V3 = ["databricks", "snowflake", "palantir"];
+const NEW_COMPANIES_V4 = ["oracle", "ibm"];
 
 export function upgradeTaxonomy(db: Database.Database): { retagged: number; restored: number } {
   const from = getSetting<number>("taxonomy_version") ?? 1;
   if (from >= TAXONOMY_VERSION) return { retagged: 0, restored: 0 };
   const newTopics = from < 2 ? NEW_TOPICS : [];
-  const newCompanies = from < 3 ? NEW_COMPANIES : [];
+  const newCompanies = [...(from < 3 ? NEW_COMPANIES_V3 : []), ...(from < 4 ? NEW_COMPANIES_V4 : [])];
   const rows = db
     .prepare(
       `SELECT id, source_id, title, excerpt, content_text, feed_categories, categories, companies, excluded, exclude_reason, cluster_id
