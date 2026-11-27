@@ -25,7 +25,7 @@ export interface ClassifyInput {
   title: string;
   text: string; // plain text from the feed (description/content)
   feedCategories: string[];
-  source: Pick<SourceDef, "id" | "section" | "company" | "defaults" | "kind">;
+  source: Pick<SourceDef, "id" | "section" | "company" | "defaults" | "kind" | "topic">;
 }
 
 export interface Classification {
@@ -425,7 +425,8 @@ export function classify(input: ClassifyInput): Classification {
   // ---- 1. Hard exclusions (title-driven, explainable)
   if (any(PUZZLES, title)) return result("puzzles");
   if (any(SPONSORED, title) || any(PROMO, title) || /\b(sponsored|partner content)\b/i.test(feedCats)) return result("sponsored");
-  if (any(DEALS, title) || any(AR_DEALS, title)) return result("deals");
+  // A data platform's blog does not post shopping deals ("Scaling Black Friday pipelines").
+  if (!input.source.topic && (any(DEALS, title) || any(AR_DEALS, title))) return result("deals");
   if (any(GUIDES, title) || any(AR_GUIDES, title)) return result("guides");
   if (any(ROUNDUP, title)) return result("roundup");
   if (any(CLICKBAIT_STRONG, title) || any(AR_CLICKBAIT_STRONG, title)) return result("clickbait");
@@ -443,8 +444,9 @@ export function classify(input: ClassifyInput): Classification {
   if (any(ESPORTS, title) && any(ESPORTS_RESULTS, title) && !any(ESPORTS_BUSINESS, titleAndHead)) return result("sports");
 
   // Entertainment (film/TV/music) unless it is about games or a tech product.
+  // Industry tags such as "Media & Entertainment" on a vendor blog are not entertainment news.
   const entertainmentFeedCat =
-    input.source.section !== "gaming" && input.feedCategories.some((c) => ENTERTAINMENT_FEED_CATEGORY.test(c.trim()));
+    input.source.section !== "gaming" && !input.source.topic && input.feedCategories.some((c) => ENTERTAINMENT_FEED_CATEGORY.test(c.trim()));
   if (STRONG_ENTERTAINMENT.test(title) && !/\b(acquir\w*|merger|earnings|layoffs?|lays off)\b/i.test(title)) return result("entertainment");
   if ((any(ENTERTAINMENT, title) || any(AR_ENTERTAINMENT, title) || (entertainmentFeedCat && !gamingAnchor)) && !gamingAnchor) {
     const businessAnchored = hasCompanyAnchor && /\b(acquir|merger|earnings|layoffs?|lays off|revenue|stake)\w*/i.test(title);
@@ -498,6 +500,8 @@ export function classify(input: ClassifyInput): Classification {
     .sort((a, b) => b[1] - a[1])
     .map(([c]) => c)
     .slice(0, 3);
+  // Posts from a single-topic source (a data platform's blog) are always about that topic too.
+  if (input.source.topic && !categories.includes(input.source.topic)) categories = [input.source.topic, ...categories].slice(0, 3);
   // Keep the Saudi tag even when other topics score higher.
   if ((scores.get("saudi") ?? 0) >= 3 && !categories.includes("saudi")) categories = [...categories.slice(0, 2), "saudi"];
 

@@ -12,6 +12,12 @@
 // - Unity Blog: unity.com/robots.txt disallows /blog/rss.
 // - Snowflake Blog: snowflake.com/robots.txt disallows /feed/.
 // - InfoWorld: infoworld.com/robots.txt disallows the feed for unlisted crawlers.
+// - Checked on 26 Nov 2026 and left out: BigDATAwire (Datanami), Arab News, Arabian Business,
+//   Gulf Business, Al Arabiya, Asharq Business and MAGNiTT answer automated readers with
+//   403/400; Rowad Al Aamal's robots.txt disallows its feed; Saudi Gazette's category feeds are
+//   general news or empty; Locally Optimistic, Airbyte, Start Data Engineering and Simply
+//   Statistics have no working feed; benn.substack, Trino and MENAbytes have not published in
+//   weeks; Analytics India Magazine (~50 posts a week) would crowd out the other data sources.
 
 export type SourceSection = "tech" | "gaming" | "official";
 
@@ -32,6 +38,11 @@ export interface SourceDef {
   defaults: ("tech" | "gaming" | "business")[];
   /** Language the source publishes in (default English). */
   lang?: "en" | "ar";
+  /**
+   * A single-topic source (e.g. a data platform's blog): its posts default to this topic when the
+   * rules find none, and shopping-deal / feed-category entertainment rules do not apply to it.
+   */
+  topic?: string;
 }
 
 export const SOURCES: SourceDef[] = [
@@ -47,9 +58,23 @@ export const SOURCES: SourceDef[] = [
   { id: "therecord", name: "The Record", publisher: "therecord", url: "https://therecord.media/feed", homepage: "https://therecord.media", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"] },
 
   // ---- Data science & analytics ----
-  { id: "siliconangle-data", name: "SiliconANGLE — Data", publisher: "siliconangle", url: "https://siliconangle.com/category/big-data/feed/", homepage: "https://siliconangle.com/category/big-data/", section: "tech", kind: "publisher", credibility: 0.8, defaults: ["tech"] },
+  { id: "siliconangle-data", name: "SiliconANGLE — Data", publisher: "siliconangle", url: "https://siliconangle.com/category/big-data/feed/", homepage: "https://siliconangle.com/category/big-data/", section: "tech", kind: "publisher", credibility: 0.8, defaults: ["tech"], topic: "data" },
   { id: "kdnuggets", name: "KDnuggets", publisher: "kdnuggets", url: "https://www.kdnuggets.com/feed", homepage: "https://www.kdnuggets.com", section: "tech", kind: "publisher", credibility: 0.7, defaults: ["tech"] },
   { id: "towards-data-science", name: "Towards Data Science", publisher: "tds", url: "https://towardsdatascience.com/feed", homepage: "https://towardsdatascience.com", section: "tech", kind: "publisher", credibility: 0.68, defaults: ["tech"] },
+  // Data engineering & analytics: the platforms' own blogs and independent newsletters (added Nov 2026).
+  { id: "databricks-blog", name: "Databricks Blog", publisher: "databricks", url: "https://www.databricks.com/feed", homepage: "https://www.databricks.com/blog", section: "tech", kind: "official", credibility: 0.85, company: "databricks", defaults: ["tech"], topic: "data" },
+  { id: "snowflake-builders", name: "Snowflake Builders Blog", publisher: "snowflake", url: "https://medium.com/feed/snowflake", homepage: "https://medium.com/snowflake", section: "tech", kind: "official", credibility: 0.8, company: "snowflake", defaults: ["tech"], topic: "data" },
+  { id: "dbt-blog", name: "dbt Labs Blog", publisher: "dbt-labs", url: "https://www.getdbt.com/blog/rss.xml", homepage: "https://www.getdbt.com/blog", section: "tech", kind: "official", credibility: 0.82, defaults: ["tech"], topic: "data" },
+  { id: "dbt-dev-blog", name: "dbt Developer Blog", publisher: "dbt-labs", url: "https://docs.getdbt.com/blog/rss.xml", homepage: "https://docs.getdbt.com/blog", section: "tech", kind: "official", credibility: 0.8, defaults: ["tech"], topic: "data" },
+  { id: "duckdb-blog", name: "DuckDB Blog", publisher: "duckdb", url: "https://duckdb.org/feed.xml", homepage: "https://duckdb.org/news/", section: "tech", kind: "official", credibility: 0.85, defaults: ["tech"], topic: "data" },
+  { id: "motherduck", name: "MotherDuck Blog", publisher: "motherduck", url: "https://motherduck.com/rss.xml", homepage: "https://motherduck.com/blog/", section: "tech", kind: "official", credibility: 0.78, defaults: ["tech"], topic: "data" },
+  { id: "data-eng-weekly", name: "Data Engineering Weekly", publisher: "dataengweekly", url: "https://www.dataengineeringweekly.com/feed", homepage: "https://www.dataengineeringweekly.com", section: "tech", kind: "publisher", credibility: 0.78, defaults: ["tech"], topic: "data" },
+  { id: "seattle-data-guy", name: "Seattle Data Guy", publisher: "seattledataguy", url: "https://seattledataguy.substack.com/feed", homepage: "https://seattledataguy.substack.com", section: "tech", kind: "publisher", credibility: 0.72, defaults: ["tech"], topic: "data" },
+  { id: "confluent-blog", name: "Confluent Blog", publisher: "confluent", url: "https://www.confluent.io/rss.xml", homepage: "https://www.confluent.io/blog/", section: "tech", kind: "official", credibility: 0.8, defaults: ["tech"], topic: "data" },
+  { id: "aws-big-data", name: "AWS Big Data Blog", publisher: "amazon", url: "https://aws.amazon.com/blogs/big-data/feed/", homepage: "https://aws.amazon.com/blogs/big-data/", section: "tech", kind: "official", credibility: 0.82, company: "amazon", defaults: ["tech"], topic: "data" },
+  { id: "gcloud-data", name: "Google Cloud — Data Analytics", publisher: "google", url: "https://cloudblog.withgoogle.com/products/data-analytics/rss/", homepage: "https://cloud.google.com/blog/products/data-analytics", section: "tech", kind: "official", credibility: 0.82, company: "google", defaults: ["tech"], topic: "data" },
+  { id: "clickhouse-blog", name: "ClickHouse Blog", publisher: "clickhouse", url: "https://clickhouse.com/rss.xml", homepage: "https://clickhouse.com/blog", section: "tech", kind: "official", credibility: 0.8, defaults: ["tech"], topic: "data" },
+  { id: "thenewstack-data", name: "The New Stack — Data", publisher: "thenewstack", url: "https://thenewstack.io/category/data/feed/", homepage: "https://thenewstack.io/category/data/", section: "tech", kind: "publisher", credibility: 0.78, defaults: ["tech"], topic: "data" },
 
   // ---- Robotics ----
   { id: "robot-report", name: "The Robot Report", publisher: "robotreport", url: "https://www.therobotreport.com/feed/", homepage: "https://www.therobotreport.com", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"] },
@@ -61,6 +86,10 @@ export const SOURCES: SourceDef[] = [
   { id: "techcrunch-saudi", name: "TechCrunch — Saudi Arabia", publisher: "techcrunch", url: "https://techcrunch.com/tag/saudi-arabia/feed/", homepage: "https://techcrunch.com/tag/saudi-arabia/", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech", "business"] },
   { id: "aitnews", name: "البوابة التقنية (AIT News)", publisher: "aitnews", url: "https://aitnews.com/feed/", homepage: "https://aitnews.com", section: "tech", kind: "publisher", credibility: 0.78, defaults: ["tech"], lang: "ar" },
   { id: "tech-wd", name: "عالم التقنية (Tech-WD)", publisher: "tech-wd", url: "https://www.tech-wd.com/wd/feed/", homepage: "https://www.tech-wd.com", section: "tech", kind: "publisher", credibility: 0.72, defaults: ["tech"], lang: "ar" },
+  // Wider Gulf / MENA technology (added Nov 2026).
+  { id: "mittr-arabia", name: "MIT Technology Review Arabia", publisher: "mittr-arabia", url: "https://technologyreview.ae/feed/", homepage: "https://technologyreview.ae", section: "tech", kind: "publisher", credibility: 0.85, defaults: ["tech"], lang: "ar" },
+  { id: "middleeast-ai", name: "Middle East AI News", publisher: "middleeastai", url: "https://www.middleeastainews.com/feed", homepage: "https://www.middleeastainews.com", section: "tech", kind: "publisher", credibility: 0.74, defaults: ["tech"] },
+  { id: "tahawultech", name: "Tahawul Tech", publisher: "tahawultech", url: "https://www.tahawultech.com/feed/", homepage: "https://www.tahawultech.com", section: "tech", kind: "publisher", credibility: 0.72, defaults: ["tech"] },
 
   // ---- Gaming publishers ----
   { id: "ign", name: "IGN", publisher: "ign", url: "https://feeds.ign.com/ign/news", homepage: "https://www.ign.com", section: "gaming", kind: "publisher", credibility: 0.8, defaults: ["gaming"] },

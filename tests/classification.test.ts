@@ -188,3 +188,16 @@ describe("embeddings request", () => {
     expect(Math.hypot(...out[0])).toBeCloseTo(1, 5);
   });
 });
+
+describe("data platform sources", () => {
+  const run = (title: string, src: string, feedCategories: string[] = []) => classify({ title, text: "", feedCategories, source: sourceById(src)! });
+  it("keeps data posts that general-news rules would drop", () => {
+    expect(run("Hints and hazards: pg_plan_advice in PG19", "clickhouse-blog").categories).toContain("data");
+    expect(run("Drowning in clicks: Scaling Black Friday pipelines with Managed Airflow", "gcloud-data").excluded).toBe(false);
+    expect(run("How Vodafone is using the Data Engineering Agent", "gcloud-data", ["Media & Entertainment"]).excluded).toBe(false);
+    expect(run("Data Modeling Best Practices for an Agentic CDP", "databricks-blog").categories).toEqual(expect.arrayContaining(["data", "ai"]));
+  });
+  it("still drops sponsored posts and newsletter round-ups", () => {
+    expect(run("DuckDB Ecosystem Newsletter : November 2026", "motherduck").excluded).toBe(true);
+  });
+});
