@@ -104,6 +104,12 @@ describe("stock quotes", () => {
     expect(fs.readFileSync(file, "utf8")).toBe(before);
   });
 
+  it("skips a ticker the plan does not cover (403) without stopping", async () => {
+    const result = await run(mockFetch(okHandler({ SONY: { status: 403, body: { error: "You don't have access to this resource." } } })).impl);
+    expect(result).toMatchObject({ status: "partial", fetched: STOCK_SYMBOLS.length - 1, missing: ["SONY"] });
+    expect(result.message).toBeUndefined();
+  });
+
   it("stops at the rate limit and keeps what it has", async () => {
     let n = 0;
     const { impl } = mockFetch((url) => {

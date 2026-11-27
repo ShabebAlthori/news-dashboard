@@ -133,8 +133,9 @@ export async function refreshStocks(opts: RefreshStocksOptions = {}): Promise<St
         headers: { "X-Finnhub-Token": apiKey!, accept: "application/json", "user-agent": config.userAgent },
         signal: AbortSignal.timeout(10_000),
       });
-      if (res.status === 401 || res.status === 403) throw new StopError(`the API key was rejected (${res.status})`);
+      if (res.status === 401) throw new StopError("the API key was rejected (401)");
       if (res.status === 429) throw new StopError("rate limited (429)");
+      // 403: this ticker is not covered by the plan; only this one is skipped.
       if (!res.ok) return null;
       return (await res.json()) as T;
     } catch (err) {
