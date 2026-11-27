@@ -8,6 +8,7 @@ import { categoryLabel, COMPANIES, MORE_TOPIC_IDS } from "@/lib/shared/taxonomy"
 import type { Prefs, SourceHealth } from "@/lib/shared/types";
 import { Segmented, Switch } from "./controls";
 import { useNow, useUi, type ThemePref } from "./providers";
+import { ReaderDataControls } from "./reader-data-controls";
 import { PageHeader } from "./states";
 import { StatusCard } from "./status-indicator";
 import { savePrefs, setSourceEnabled } from "@/lib/client/actions";
@@ -242,7 +243,10 @@ export function SettingsView() {
           {prefs && (
             <div className="space-y-3">
               {IS_STATIC ? (
-                <p className="text-sm text-muted">{t("settings.localData")}</p>
+                <>
+                  <p className="text-sm text-muted">{t("settings.localData")}</p>
+                  <ReaderDataControls />
+                </>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="font-medium text-fg">{t("settings.retention")}</span>

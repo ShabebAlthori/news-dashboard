@@ -8,6 +8,7 @@ import type { Section } from "@/lib/shared/taxonomy";
 import { nextReportAt } from "@/lib/shared/schedule";
 import type { HomeFile, Prefs, RadarResponse, ReportResponse, Snapshot, SnapshotStory, SourceHealth, StatusResponse, StoriesResponse, Story, WeeklyReport } from "@/lib/shared/types";
 import { normalizePrefs } from "@/lib/shared/prefs";
+import { buildReaderData, MAX_READ, MAX_SAVED, mergeReaderData, parseReaderData, type ReaderData } from "@/lib/shared/reader-data";
 import type { StocksFile } from "@/lib/shared/stocks";
 import { mutate } from "swr";
 import { BASE_PATH } from "./mode";
@@ -21,8 +22,6 @@ interface StatusFile {
 }
 
 const KEYS = { prefs: "briefing.prefs", saved: "briefing.saved", read: "briefing.read" } as const;
-const MAX_SAVED = 500;
-const MAX_READ = 4000;
 
 let snapshot: Snapshot | null = null;
 let snapshotPromise: Promise<Snapshot> | null = null;
@@ -307,4 +306,31 @@ export async function setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
   const next = normalizePrefs({ ...getPrefs(home.defaultPrefs), ...patch });
   writeStorage(KEYS.prefs, next);
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Export / import of this browser's reader data (Settings → Data)
+
+/** Everything this browser keeps for the reader, as one JSON-ready object. */
+export async function exportReaderData(display: ReaderData["display"]): Promise<ReaderData> {
+  const home = await getHome();
+  return buildReaderData({ settings: getPrefs(home.defaultPrefs), display, saved: [...savedMap().values()], read: readStorage<string[]>(KEYS.read, []) });
+}
+
+/** Validates an export file's JSON (null if it is not one) and counts what importing it would add. */
+export async function prepareImport(raw: unknown): Promise<{ data: ReaderData; addedSaved: number; addedRead: number } | null> {
+  const home = await getHome();
+  const data = parseReaderData(raw, home.defaultPrefs);
+  if (!data) return null;
+  const { addedSaved, addedRead } = mergeReaderData({ saved: [...savedMap().values()], read: readStorage<string[]>(KEYS.read, []) }, data);
+  return { data, addedSaved, addedRead };
+}
+
+/** Merges saved articles and read history, and replaces the settings with the imported ones. */
+export function applyImport(data: ReaderData): { addedSaved: number; addedRead: number } {
+  const merged = mergeReaderData({ saved: [...savedMap().values()], read: readStorage<string[]>(KEYS.read, []) }, data);
+  writeStorage(KEYS.saved, merged.saved);
+  writeStorage(KEYS.read, merged.read);
+  writeStorage(KEYS.prefs, data.settings);
+  return { addedSaved: merged.addedSaved, addedRead: merged.addedRead };
 }
