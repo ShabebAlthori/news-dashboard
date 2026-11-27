@@ -457,7 +457,7 @@ tests/                    Vitest suites
 
 ## Troubleshooting
 
-- **No stories yet**: the first refresh runs about 5 seconds after boot. Check the sidebar status, or run `npm run refresh` and read its JSON output.
+- **No stories yet**: the first refresh runs about 5 seconds after boot. Check the update status in the header (or the menu on phones), or run `npm run refresh` and read its JSON output.
 - **A source shows "Unavailable"**: the error is listed in Settings → Sources. The app retries with backoff, and that source's earlier articles stay visible.
 - **Arabic summaries missing**: check Settings → Summaries & translation for the provider status and the last error. Without a provider, Arabic summaries are intentionally unavailable.
 - **`better-sqlite3` build errors**: use Node 20.9+ on a platform with prebuilt binaries, or install a C++ toolchain (`python3 make g++`).
