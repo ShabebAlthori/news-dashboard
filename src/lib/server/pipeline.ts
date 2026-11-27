@@ -11,6 +11,7 @@ import { mergeDuplicateStories } from "./merge";
 import { refreshRadar } from "./radar";
 import { maybeGenerateWeeklyReport } from "./report";
 import { checkRobots } from "./robots";
+import { refreshStocks } from "./stocks";
 import { getPrefs, getSetting, setSetting } from "./settings";
 import { SOURCES, sourceById, type SourceDef } from "./sources";
 import { canonicalizeUrl, feedExcerptSummary, tokenize } from "./text";
@@ -414,6 +415,13 @@ export async function runRefresh(trigger: "schedule" | "manual" | "cron" | "cli"
       if (report) console.log(`[refresh] weekly report published (${report.totals.stories} stories)`);
     } catch (err) {
       console.error("[refresh] weekly report failed:", err);
+    }
+    // Stock quotes: independent of the news; a failure keeps the last good file and never fails the refresh.
+    try {
+      const stocks = await refreshStocks();
+      if (stocks.status !== "skipped") console.log(`[stocks] ${JSON.stringify(stocks)}`);
+    } catch (err) {
+      console.error("[refresh] stock quotes failed:", (err as Error).message);
     }
 
     const status: RefreshResult["status"] = ok === 0 && enabled.length > 0 ? "failed" : failed > 0 ? "partial" : "ok";

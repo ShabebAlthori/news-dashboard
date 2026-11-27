@@ -98,6 +98,8 @@ export interface DashboardResponse {
   briefingFacts: BriefingFacts;
   /** Newest stories, nudged towards the reader's two highest-priority categories. */
   latest: Story[];
+  /** Up to three more Latest stories, used by no other section (a third row on wide screens). */
+  latestMore?: Story[];
   /** News activity of the tracked companies (story counts, not market data). */
   trending: CompanyPulse[];
   tech: Story[];
@@ -284,6 +286,7 @@ export interface PackedDashboard {
   top: number[];
   briefing: number[];
   latest: number[];
+  latestMore?: number[];
   tech: number[];
   gaming: number[];
   announcements: number[];

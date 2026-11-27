@@ -10,45 +10,18 @@ import { formatLongDate, formatRelative } from "@/lib/shared/format";
 import { categoryLabel, companyById, shortCategoryLabel } from "@/lib/shared/taxonomy";
 import type { BriefingFacts, CompanyPulse, DashboardResponse, Story } from "@/lib/shared/types";
 import { CategoryChips } from "./category-chips";
+import { IconBubble, PanelTitle, ViewAll } from "./panel";
 import { CompanyLogo, SourceLogo } from "./logos";
 import { NewsCard, StoryLine, StoryTime } from "./news-card";
 import { useNow, useUi } from "./providers";
 import { RadarPanel } from "./radar-view";
 import { ReportPanel } from "./report-view";
 import { EmptyState, ErrorState, NewStoriesBanner } from "./states";
+import { StocksCard, useStocks } from "./stocks";
 import { useUpdateParams } from "./story-feed";
 import { storyHeadline, storySummary } from "./story-text";
 import { BookmarkButton, CategoryBadge, OriginalLangTag, StoryImage, useStoryCategory } from "./story-visuals";
 import { useHasNewer, useStatus } from "./use-data";
-
-function ViewAll({ href, label }: { href: string; label?: string }) {
-  const { t } = useUi();
-  return (
-    <Link href={href} className="inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap text-sm font-medium text-accent hover:underline">
-      {label ?? t("dash.seeAll")}
-      <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
-    </Link>
-  );
-}
-
-function PanelTitle({ icon, title, hint, action, id }: { icon: ReactNode; title: string; hint?: string; action?: ReactNode; id?: string }) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-3">
-        <span className="shrink-0">{icon}</span>
-        <h2 id={id} className="min-w-0 text-lg font-bold leading-tight text-fg">
-          {title}
-        </h2>
-        <span className="ms-auto shrink-0">{action}</span>
-      </div>
-      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
-    </div>
-  );
-}
-
-function IconBubble({ children }: { children: ReactNode }) {
-  return <span className="inline-flex size-9 items-center justify-center rounded-full bg-accent-soft text-accent">{children}</span>;
-}
 
 // ---------------------------------------------------------------------------
 // A. Featured carousel
@@ -307,7 +280,7 @@ function TrendingCompanies({ companies }: { companies: CompanyPulse[] }) {
   const active = companies.filter((c) => c.count > 0).slice(0, 6);
   const rest = companies.filter((c) => !active.includes(c));
   return (
-    <section className="card flex h-full flex-col p-5" aria-labelledby="trending-title">
+    <section className="card flex flex-1 flex-col p-5" aria-labelledby="trending-title">
       <PanelTitle
         id="trending-title"
         icon={
@@ -424,6 +397,8 @@ export function DashboardView() {
   const { data, error, isLoading, mutate } = useSWR<DashboardResponse>(key, { refreshInterval: 0 });
   const { data: status } = useStatus();
   const newer = useHasNewer(data?.generatedAt);
+  // Started together with the dashboard data, so the Stocks box is usually ready when the page renders.
+  useStocks();
 
   const chips = <CategoryChips value={category} onChange={(id) => update({ cat: id })} />;
   const header = (
@@ -501,12 +476,19 @@ export function DashboardView() {
                   {data.latest.map((s) => (
                     <NewsCard key={s.id} story={s} />
                   ))}
+                  {data.latest.length === 6 &&
+                    data.latestMore?.length === 3 &&
+                    data.latestMore.map((s) => <NewsCard key={s.id} story={s} className="hidden xl:flex" />)}
                 </div>
               ) : (
                 <EmptyState title={t("list.empty")} />
               )}
             </section>
-            <TrendingCompanies companies={data.trending} />
+            {/* Right column: Trending Companies, then Stocks (after it on mobile) */}
+            <div className="flex flex-col gap-5">
+              <TrendingCompanies companies={data.trending} />
+              <StocksCard />
+            </div>
           </div>
 
           {/* Row 3: Data Radar + Weekly Tech Report */}

@@ -202,7 +202,7 @@ export function SettingsView() {
           )}
         </Card>
 
-        <Card title={t("settings.companies")} hint={t("settings.companiesHint")}>
+        <Card id="companies" title={t("settings.companies")} hint={t("settings.companiesHint")}>
           {prefs && (
             <div className="flex flex-wrap gap-1.5">
               {COMPANIES.map((c) => (

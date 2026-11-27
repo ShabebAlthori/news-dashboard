@@ -6,7 +6,7 @@ import { openDatabase } from "@/lib/server/db";
 import type { ParsedItem } from "@/lib/server/feed-parser";
 import { listRadarItems, normalizeFeedItem, normalizeGithubRepos, radarSourceById } from "@/lib/server/radar";
 import { buildWeeklyReport } from "@/lib/server/report";
-import { buildDashboard, type RankContext } from "@/lib/shared/rank";
+import { buildDashboard, packDashboard, unpackDashboard, type RankContext } from "@/lib/shared/rank";
 import { isRadarLive, lastReportSlot, nextReportAt } from "@/lib/shared/schedule";
 import { DASHBOARD_CHIPS, TRENDING_COMPANY_IDS } from "@/lib/shared/taxonomy";
 import { DEFAULT_PREFS, type RadarItem, type SnapshotStory } from "@/lib/shared/types";
@@ -254,5 +254,29 @@ describe("database migration", () => {
     expect(db.prepare("SELECT count(*) AS n FROM ai_cache").get()).toEqual({ n: 0 });
     expect((db.prepare("PRAGMA table_info(articles)").all() as { name: string }[]).some((c) => c.name === "title_ai_attempts")).toBe(true);
     db.close();
+  });
+});
+
+describe("wide-screen Latest row", () => {
+  // Many publishers, so the two-per-source cap leaves more than six Latest candidates.
+  const many = Array.from({ length: 40 }, (_, i) =>
+    story({ title: `Story ${i}`, hoursAgo: 1 + i * 0.5, categories: [i % 2 ? "ai" : "dev"], baseScore: 30 + (i % 7), source: { id: `src-${i % 20}`, name: `Source ${i % 20}`, official: false } }),
+  );
+  const d = buildDashboard(many, ctx);
+
+  it("adds up to three extra cards that no other section shows", () => {
+    const more = d.latestMore ?? [];
+    expect(more).toHaveLength(3);
+    const elsewhere = new Set([...d.top, ...d.latest, ...d.announcements, ...d.missed, ...d.tech, ...d.gaming].map((s) => s.id));
+    expect(more.some((s) => elsewhere.has(s.id))).toBe(false);
+    expect(d.latest).toHaveLength(6);
+    // Still at most two cards per publisher across all nine.
+    const perSource = new Map<string, number>();
+    for (const s of [...d.latest, ...more]) perSource.set(s.source.id, (perSource.get(s.source.id) ?? 0) + 1);
+    expect(Math.max(...perSource.values())).toBeLessThanOrEqual(2);
+  });
+
+  it("survives packing for home.json", () => {
+    expect(unpackDashboard(packDashboard(d)).latestMore?.map((s) => s.id)).toEqual(d.latestMore?.map((s) => s.id));
   });
 });

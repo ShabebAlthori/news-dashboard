@@ -8,7 +8,7 @@
 //   older cached copy is never shown as if it were current.
 const VERSION = "techpulse-v1";
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
-const SHELL = ["/", "/latest/", "/radar/", "/technology/", "/gaming/", "/companies/", "/saved/", "/settings/", "/search/", "/report/", "/manifest.webmanifest", "/icons/icon-192.png"].map((p) => BASE + p);
+const SHELL = ["/", "/latest/", "/radar/", "/technology/", "/gaming/", "/companies/", "/saved/", "/settings/", "/search/", "/report/", "/stocks/", "/manifest.webmanifest", "/icons/icon-192.png"].map((p) => BASE + p);
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 const DATA = `${VERSION}-data`;

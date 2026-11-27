@@ -8,6 +8,7 @@ import type { Section } from "@/lib/shared/taxonomy";
 import { nextReportAt } from "@/lib/shared/schedule";
 import type { HomeFile, Prefs, RadarResponse, ReportResponse, Snapshot, SnapshotStory, SourceHealth, StatusResponse, StoriesResponse, Story, WeeklyReport } from "@/lib/shared/types";
 import { normalizePrefs } from "@/lib/shared/prefs";
+import type { StocksFile } from "@/lib/shared/stocks";
 import { mutate } from "swr";
 import { BASE_PATH } from "./mode";
 
@@ -15,6 +16,8 @@ interface StatusFile {
   generatedAt: string;
   status: StatusResponse;
   sources: SourceHealth[];
+  /** Version of data/stocks.json; null or absent when no quotes are published. */
+  stocksAt?: string | null;
 }
 
 const KEYS = { prefs: "briefing.prefs", saved: "briefing.saved", read: "briefing.read" } as const;
@@ -104,9 +107,9 @@ export interface ReportFile {
 
 const dataFiles = new Map<string, { version: string; promise: Promise<unknown> }>();
 
-/** Radar and report files follow the snapshot's version so they refresh together. */
-async function getDataFile<T>(name: string): Promise<T> {
-  const version = latestGeneratedAt ?? (await loadStatusFile()).generatedAt;
+/** Radar and report files follow the snapshot's version so they refresh together; stocks.json has its own. */
+async function getDataFile<T>(name: string, fixedVersion?: string): Promise<T> {
+  const version = fixedVersion ?? latestGeneratedAt ?? (await loadStatusFile()).generatedAt;
   const cached = dataFiles.get(name);
   if (cached && cached.version === version) return cached.promise as Promise<T>;
   const promise = getJson<T>(name, version).catch((err) => {
@@ -221,6 +224,12 @@ export async function staticFetch<T>(key: string): Promise<T> {
         nextAt: new Date(nextReportAt(Date.now())).toISOString(),
         generatedAt: file.generatedAt,
       } satisfies ReportResponse as T;
+    }
+    case "/api/stocks": {
+      // A separate small file with its own version, so quotes never enlarge home.json.
+      const { stocksAt } = await loadStatusFile();
+      if (!stocksAt) throw new Error("No stock quotes are published");
+      return (await getDataFile<StocksFile>("stocks.json", stocksAt)) as T;
     }
     case "/api/companies": {
       const { snap, ctx } = await context();

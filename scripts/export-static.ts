@@ -4,6 +4,7 @@
 //   out/data/radar.json     — Data Radar items (releases, research, updates) and radar source health
 //   out/data/report.json    — the latest Weekly Tech Reports
 //   out/data/home.json      — the small subset the home page needs (loaded instead of snapshot.json)
+//   out/data/stocks.json    — delayed stock quotes for the Stocks box (only if FINNHUB_API_KEY is set)
 // Usage: npm run export:static [-- <output dir>] [--no-refresh]
 import fs from "node:fs";
 import path from "node:path";
@@ -15,6 +16,8 @@ import { getRadar } from "../src/lib/server/radar";
 import { listReports, maybeGenerateWeeklyReport } from "../src/lib/server/report";
 import { defaultPrefs } from "../src/lib/server/settings";
 import { getSourcesHealth, getStatus } from "../src/lib/server/status";
+import { readStocksFile, stocksFilePath, writeStocksFile } from "../src/lib/server/stocks";
+import { isStocksFile } from "../src/lib/shared/stocks";
 import { buildHomeFile } from "../src/lib/shared/rank";
 import type { Snapshot } from "../src/lib/shared/types";
 
@@ -33,6 +36,21 @@ async function main() {
       if (res.ok) console.log(`Seeded ${seedCacheFromSnapshot(db, ((await res.json()) as Snapshot).stories)} cached translations from the published snapshot`);
     } catch (err) {
       console.warn("Could not seed the translation cache:", (err as Error).message);
+    }
+  }
+
+  // The last good quotes live next to the database (carried by the Actions cache). If that copy
+  // is gone, start from the published file so a failed fetch still leaves the last good quotes.
+  if (!readStocksFile() && process.env.PAGES_URL) {
+    try {
+      const res = await fetch(`${process.env.PAGES_URL.replace(/\/$/, "")}/data/stocks.json`, { signal: AbortSignal.timeout(15_000) });
+      const published: unknown = res.ok ? await res.json() : null;
+      if (isStocksFile(published)) {
+        writeStocksFile(published);
+        console.log(`Restored the last published stock quotes (${published.generatedAt})`);
+      }
+    } catch (err) {
+      console.warn("Could not restore the published stock quotes:", (err as Error).message);
     }
   }
 
@@ -63,8 +81,11 @@ async function main() {
   // the reader's saved/read state, or rebuilds from snapshot.json when preferences differ).
   const home = buildHomeFile({ ...snapshot, generatedAt }, radar, reports[0] ? { id: reports[0].id, periodStart: reports[0].periodStart, periodEnd: reports[0].periodEnd } : null);
   fs.writeFileSync(path.join(outDir, "home.json"), JSON.stringify(home));
+  // Stock quotes: a separate small file (not part of home.json), published only when it exists.
+  const stocks = readStocksFile();
+  if (stocks) fs.copyFileSync(stocksFilePath(), path.join(outDir, "stocks.json"));
   // status.json last: the page polls it and then loads the other files at this version.
-  fs.writeFileSync(path.join(outDir, "status.json"), JSON.stringify({ generatedAt, status, sources }));
+  fs.writeFileSync(path.join(outDir, "status.json"), JSON.stringify({ generatedAt, status, sources, stocksAt: stocks?.generatedAt ?? null }));
   const kb = (f: string) => Math.round(fs.statSync(path.join(outDir, f)).size / 1024);
   console.log(`Wrote ${stories.length} stories (${kb("snapshot.json")} KB; home.json ${kb("home.json")} KB) to ${outDir}`);
   if (!status.lastSuccessAt && stories.length === 0) process.exit(1);

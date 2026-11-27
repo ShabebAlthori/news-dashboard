@@ -28,7 +28,7 @@ export function StoryTime({ story, className = "" }: { story: Story; className?:
 }
 
 /** Image card for the Latest News grid. */
-export function NewsCard({ story }: { story: Story }) {
+export function NewsCard({ story, className = "" }: { story: Story; className?: string }) {
   const { t, lang } = useUi();
   const category = useStoryCategory(story);
   const h = storyHeadline(story, lang);
@@ -36,7 +36,7 @@ export function NewsCard({ story }: { story: Story }) {
   const open = () => markRead(story.leadArticleId, story.url);
 
   return (
-    <article className={`card card-hover group flex min-w-0 flex-col overflow-hidden ${story.read ? "opacity-90" : ""}`}>
+    <article className={`card card-hover group min-w-0 flex-col overflow-hidden ${className || "flex"} ${story.read ? "opacity-90" : ""}`}>
       <a href={story.url} target="_blank" rel="noopener noreferrer" onClick={open} tabIndex={-1} aria-hidden className="relative block aspect-[16/9] overflow-hidden bg-surface-2">
         <StoryImage story={story} category={category} className="size-full transition-transform duration-500 group-hover:scale-[1.03]" />
         <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />

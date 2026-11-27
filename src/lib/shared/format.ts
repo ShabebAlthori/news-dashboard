@@ -31,6 +31,11 @@ export function formatTime(iso: string, lang: Lang): string {
   return dtf(lang, { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 }
 
+/** Day and month of a trading session, in the exchange's own time zone (US markets by default). */
+export function formatSessionDate(iso: string, lang: Lang, timeZone = "America/New_York"): string {
+  return dtf(lang, { day: "numeric", month: "short", timeZone }).format(new Date(iso));
+}
+
 export function formatLongDate(date: Date, lang: Lang): string {
   return dtf(lang, { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
 }

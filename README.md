@@ -34,6 +34,11 @@ The web edition is a free, always-on copy of the dashboard hosted on GitHub Page
   2. On GitHub, open **Settings → Secrets and variables → Actions → New repository secret** and add it as `GEMINI_API_KEY`.
 
   The next run starts summarizing. Alternatively add `ANTHROPIC_API_KEY` for Claude (paid; used first if both are set). Without a key, the page shows the publishers' own excerpts.
+- **Stocks box (optional, free).** Delayed quotes for NVIDIA, Microsoft, Alphabet, Apple and Amazon on the home page, and a **Stocks** page for the followed companies with US-listed shares.
+  1. Create a free key at <https://finnhub.io/register>.
+  2. Add it as the repository secret `FINNHUB_API_KEY` (same place as above).
+
+  The key is used only by the workflow; the page reads the published `data/stocks.json`. Without a key, or while quotes cannot be fetched, the box stays hidden. Data: [Finnhub](https://finnhub.io) free plan (60 API calls per minute; about 17 calls per run, US exchanges only, for personal use; see Finnhub's terms before using the data commercially). Quotes are published with each run, so they are up to about 15 minutes old. They are not financial advice.
 - **Visibility.** GitHub Pages sites from free accounts are public, so anyone with the link can open the page. It asks search engines not to index it. No keys or passwords are ever published.
 - **Manual update.** Open the **Actions** tab → **Web edition** → **Run workflow**.
 - **Schedule pauses.** GitHub pauses schedules after 60 days without repository activity. The workflow makes an empty commit when needed to keep it running.
@@ -48,7 +53,7 @@ BASE_PATH=/news-dashboard npm run build:static
 npm run export:static
 ```
 
-The first command writes the site to `out/`; the second refreshes feeds and writes `out/data/` (`snapshot.json`, `status.json`, `radar.json`, `report.json`).
+The first command writes the site to `out/`; the second refreshes feeds and writes `out/data/` (`snapshot.json`, `home.json`, `status.json`, `radar.json`, `report.json`, and `stocks.json` when `FINNHUB_API_KEY` is set).
 
 ---
 
@@ -140,7 +145,8 @@ npm start
 - **Featured Top Story** carousel: the five most important stories, using the publisher's own image (abstract category artwork when there is none), with source, publication time, Read more and bookmark.
 - **Daily Briefing:** the leading story of each of your priority categories in the last 24 hours, plus a *key takeaway* that is counted, not written: number of stories, most active category and most covered company.
 - **Latest News** grid: newest first, with your two highest-priority categories (by default Data & Analytics and AI) brought forward. Stories without a publication time are not treated as brand new, and no publisher fills more than two cards.
-- **Trending Companies:** NVIDIA, Microsoft, Google, Apple, Amazon, AMD, Intel, OpenAI, Anthropic, Databricks, Snowflake and Palantir, ranked by **news activity** (stories in 48 hours) with their latest headline. **No stock prices or percentage changes are shown**; the dashboard has no verified market-data source.
+- **Trending Companies:** NVIDIA, Microsoft, Google, Apple, Amazon, AMD, Intel, OpenAI, Anthropic, Databricks, Snowflake and Palantir, ranked by **news activity** (stories in 48 hours) with their latest headline. This box shows news counts only, never market data.
+- **Stocks:** under Trending Companies, delayed quotes (▲/▼ percent change since the previous close) for NVDA, MSFT, GOOGL, AAPL and AMZN (`HOME_STOCK_SYMBOLS` in [`src/lib/shared/stocks.ts`](src/lib/shared/stocks.ts)), with the update time, "Market closed" and the last close outside trading hours, and the note "Delayed quotes, not financial advice." **View all** opens the Stocks page with the price and change of every followed company that has a ticker (`COMPANY_TICKERS`). Quotes come from Finnhub through the server/workflow only (`FINNHUB_API_KEY`); a failed or partial fetch keeps the last good quotes, older quotes are shown muted with their age, and the box is hidden when no quotes are available.
 - **Data Radar** panel and **Weekly Tech Report** panel (below), then Your categories, Key announcements, You might have missed, Technology today and Biggest in gaming.
 
 **Data Radar** (`/radar`)
@@ -314,6 +320,8 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 | `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` | `gemini-3.8-flash` / `gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite` | Gemini models; fallbacks are tried in order when the main model is busy or out of free quota |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `qwen2.5:7b-instruct` | Free local model |
 | `AI_MAX_ARTICLES_PER_RUN` / `AI_DAILY_LIMIT` / `AI_CONCURRENCY` | `30` / `200` / `3` | Cost and throughput guards |
+| `FINNHUB_API_KEY` | — | Free Finnhub key for the Stocks box (server/CI only); without it the box is hidden |
+| `STOCKS_FILE` | `./data/stocks.json` | Where the last good quotes are kept (next to the database by default) |
 | `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | — | HTTP Basic auth for the whole app when both are set |
 
 ---

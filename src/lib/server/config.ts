@@ -74,6 +74,10 @@ export const config = {
     windowDays: int("AI_WINDOW_DAYS", 7, 1, 30),
     concurrency: int("AI_CONCURRENCY", 3, 1, 10),
   },
+  stocks: {
+    /** Finnhub API key (free plan) for the Stocks box. Server/CI only; never sent to the browser. */
+    finnhubApiKey: process.env.FINNHUB_API_KEY?.trim() || "",
+  },
   auth: {
     user: process.env.DASHBOARD_USER || "",
     password: process.env.DASHBOARD_PASSWORD || "",

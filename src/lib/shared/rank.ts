@@ -258,15 +258,13 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
   const nudge = (s: Ranked) => (s.firstPublishedAt ?? s.sortTime - 24 * HOUR) + (s.categories.some((t) => boosted.has(t)) ? 6 * HOUR : 0);
   latestPool.sort((a, b) => nudge(b) - nudge(a) || b.score - a.score);
   const perSource = new Map<string, number>();
-  const latest = pick(
-    latestPool.filter((s) => {
-      const n = perSource.get(s.source.id) ?? 0;
-      if (n >= 2) return false;
-      perSource.set(s.source.id, n + 1);
-      return true;
-    }),
-    6,
-  );
+  const latestCandidates = latestPool.filter((s) => {
+    const n = perSource.get(s.source.id) ?? 0;
+    if (n >= 2) return false;
+    perSource.set(s.source.id, n + 1);
+    return true;
+  });
+  const latest = pick(latestCandidates, 6);
 
   const tech = pick(recent.filter((c) => c.sections.includes("tech")), 6);
   const gaming = pick(recent.filter((c) => c.sections.includes("gaming")), 6);
@@ -279,6 +277,9 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
   const older = rank(stories, { ...scope, from: now - 96 * HOUR, to: now - 10 * HOUR }, ctx);
   sortRanked(older, "importance");
   const missed = pick(older.filter((c) => !c.read), opts.missedCount ?? 6, 50);
+  // A third row of Latest cards for wide screens (shown from 1280px, next to the taller right
+  // column): only stories that no other section uses, so narrower screens lose nothing.
+  const latestMore = latestCandidates.filter((s) => !shown.has(s.id)).slice(0, 3).map(strip);
 
   const pulse = (ids: string[]): CompanyPulse[] =>
     ids
@@ -311,6 +312,7 @@ export function buildDashboard(stories: SnapshotStory[], rawCtx: RankContext, op
     briefing: briefingPicks.map(strip),
     briefingFacts: { windowHours: briefWindow, stories: day.length, topCategory: category ? null : best(catCounts, true), topCompany: busiest ? { id: busiest.companyId, count: busiest.count } : null },
     latest,
+    latestMore,
     trending,
     tech,
     gaming,
@@ -352,6 +354,7 @@ export function withReaderState(d: DashboardResponse, saved: Set<string>, read: 
     top: list(d.top),
     briefing: list(d.briefing),
     latest: list(d.latest),
+    latestMore: list(d.latestMore ?? []),
     tech: list(d.tech),
     gaming: list(d.gaming),
     announcements: list(d.announcements),
@@ -396,6 +399,7 @@ export function packDashboard(d: DashboardResponse): PackedDashboard {
     top: ids(d.top),
     briefing: ids(d.briefing),
     latest: ids(d.latest),
+    latestMore: ids(d.latestMore ?? []),
     tech: ids(d.tech),
     gaming: ids(d.gaming),
     announcements: ids(d.announcements),
@@ -417,6 +421,7 @@ export function unpackDashboard(p: PackedDashboard): DashboardResponse {
     top: list(p.top),
     briefing: list(p.briefing),
     latest: list(p.latest),
+    latestMore: list(p.latestMore ?? []),
     tech: list(p.tech),
     gaming: list(p.gaming),
     announcements: list(p.announcements),
