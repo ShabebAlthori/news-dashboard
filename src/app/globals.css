@@ -3,76 +3,87 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * TechPulse design tokens. Token names are shared by every component, so the palette can
- * change without touching markup. Dark is the signature theme; light mirrors it.
- *  --brand      solid violet for fills, gradients and active states (white text on top)
- *  --accent     violet that is readable as text on surfaces
- *  --accent-2   secondary blue
- *  --ok         success / live green
+ * TechPulse design system.
+ *
+ * Editorial first: content sits on the page, separated by hairline rules and whitespace, not
+ * boxed into cards. Surfaces are reserved for things that float or group controls (menus,
+ * the status panel, inputs). Purple is used sparingly — active states and the one primary
+ * action on a screen. No glows, no decorative gradients, no heavy shadows.
+ *
+ * Tokens (shared names, so markup never hard-codes a theme):
+ *  --bg / --bg-2        page and secondary background (header, footer, rails)
+ *  --surface(-2/-3)     raised surfaces, hover and pressed states
+ *  --border(-strong)    hairline rules and control borders
+ *  --text / --muted / --subtle   primary, secondary and tertiary text (all ≥ 4.5:1)
+ *  --brand              purple fill with white text (primary buttons, active pills)
+ *  --accent             purple readable as text and indicators
+ *  --accent-2           blue (links in technical panels, research items)
+ *  --ok / --caution / --breaking  status colours
  */
 :root {
-  --bg: #f3f4fa;
-  --sidebar: #ffffff;
+  --bg: #fafaf9;
+  --bg-2: #ffffff;
   --surface: #ffffff;
-  --surface-2: #eef0f8;
-  --surface-3: #e4e7f3;
-  --border: #dde1ee;
-  --border-strong: #c7cce0;
-  --text: #0f1226;
-  --muted: #4b5372;
-  --subtle: #677090;
-  --brand: #713bff;
-  --brand-2: #4388ff;
-  --accent: #5b2be0;
-  --accent-strong: #4a1fc4;
-  --accent-soft: #ede7ff;
-  --accent-2: #2463d6;
-  --breaking: #c4232d;
-  --breaking-soft: #fdeaec;
-  --caution: #94590a;
-  --caution-soft: #fcf1dd;
-  --ok: #0c8150;
-  --ok-soft: #e0f6ec;
-  --glass: rgba(255, 255, 255, 0.84);
-  --elev-card: 0 1px 2px rgba(15, 18, 38, 0.05), 0 8px 24px -12px rgba(15, 18, 38, 0.12);
-  --elev-lift: 0 2px 4px rgba(15, 18, 38, 0.06), 0 18px 40px -16px rgba(60, 30, 160, 0.25);
-  --font-en: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-ar: "IBM Plex Sans Arabic", "Inter Variable", "Inter", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --surface-2: #f2f2f4;
+  --surface-3: #e8e8ec;
+  --border: #e6e6ea;
+  --border-strong: #d2d2d9;
+  --text: #0b0c10;
+  --muted: #585d6b;
+  --subtle: #6b7080;
+  --brand: #5b3fd9;
+  --brand-2: #2f65d6;
+  --accent: #5b3fd9;
+  --accent-strong: #4a2fc4;
+  --accent-soft: #efebff;
+  --accent-2: #2f65d6;
+  --breaking: #c42b2b;
+  --breaking-soft: #fdeceb;
+  --caution: #8f560a;
+  --caution-soft: #fcf2e1;
+  --ok: #0e7a52;
+  --ok-soft: #e3f5ed;
+  --scrim: rgba(11, 12, 16, 0.4);
+  --elev-pop: 0 12px 32px -12px rgba(11, 12, 16, 0.18), 0 2px 6px -2px rgba(11, 12, 16, 0.08);
+  --font-en: "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ar: "IBM Plex Sans Arabic", "Geist Variable", "Geist", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "IBM Plex Sans Arabic", monospace;
   color-scheme: light;
 }
 
 .dark {
-  --bg: #090b18;
-  --sidebar: #101326;
-  --surface: #151a30;
-  --surface-2: #1b2140;
-  --surface-3: #232a4d;
-  --border: #29304b;
-  --border-strong: #3a4266;
-  --text: #f5f6ff;
-  --muted: #a6aec8;
-  --subtle: #8189a8;
-  --brand: #713bff;
-  --brand-2: #4388ff;
-  --accent: #a07fff;
-  --accent-strong: #bea8ff;
-  --accent-soft: #241d52;
-  --accent-2: #6ea3ff;
-  --breaking: #ff6f78;
-  --breaking-soft: #3a1520;
-  --caution: #f3b75c;
-  --caution-soft: #33260f;
-  --ok: #20d98a;
-  --ok-soft: #0f2c25;
-  --glass: rgba(16, 19, 38, 0.8);
-  --elev-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 10px 30px -18px rgba(0, 0, 0, 0.8);
-  --elev-lift: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 22px 44px -20px rgba(113, 59, 255, 0.45);
+  --bg: #0b0c10;
+  --bg-2: #101218;
+  --surface: #151821;
+  --surface-2: #1b1f2a;
+  --surface-3: #242938;
+  --border: #20242f;
+  --border-strong: #2e3341;
+  --text: #f5f5f7;
+  --muted: #9298a8;
+  --subtle: #7c8293;
+  --brand: #6e56f0;
+  --brand-2: #65a6ff;
+  --accent: #8b72ff;
+  --accent-strong: #a998ff;
+  --accent-soft: #1b1830;
+  --accent-2: #65a6ff;
+  --breaking: #ff7a7a;
+  --breaking-soft: #2c1517;
+  --caution: #f2b45a;
+  --caution-soft: #2a2112;
+  --ok: #56d6a0;
+  --ok-soft: #102620;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --elev-pop: 0 16px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.02);
   color-scheme: dark;
 }
 
 @theme inline {
   --color-bg: var(--bg);
-  --color-sidebar: var(--sidebar);
+  --color-bg-2: var(--bg-2);
+  /* Kept for older markup: the secondary background. */
+  --color-sidebar: var(--bg-2);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
@@ -94,11 +105,13 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --font-sans: var(--font-en);
+  --font-mono: var(--font-mono);
   /* Meta text (sources, times, counts) is 13px rather than 12px for legibility. */
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.125rem;
-  --shadow-card: var(--elev-card);
-  --shadow-lift: var(--elev-lift);
+  --shadow-card: none;
+  --shadow-lift: var(--elev-pop);
+  --shadow-pop: var(--elev-pop);
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
@@ -114,10 +127,10 @@
 @keyframes pulse-dot {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent);
   }
   60% {
-    box-shadow: 0 0 0 5px transparent;
+    box-shadow: 0 0 0 4px transparent;
   }
 }
 
@@ -131,24 +144,18 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-en);
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
+  font-feature-settings: "ss01" 0;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-}
-
-/* A faint violet wash at the top of the canvas — atmosphere, not decoration. */
-.dark body {
-  background:
-    radial-gradient(1200px 520px at 70% -180px, rgba(113, 59, 255, 0.13), transparent 70%),
-    radial-gradient(900px 420px at 0% 110%, rgba(67, 136, 255, 0.06), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Arabic is a first-class script: dedicated typeface and more generous leading. */
 html[lang="ar"] body {
   font-family: var(--font-ar);
-  line-height: 1.75;
+  line-height: 1.8;
 }
 [lang="en"] {
   font-family: var(--font-en);
@@ -156,17 +163,22 @@ html[lang="ar"] body {
 [lang="ar"] {
   font-family: var(--font-ar);
 }
-html[lang="ar"] h1,
-html[lang="ar"] h2,
-html[lang="ar"] h3 {
+:where(h1, h2, h3) {
+  text-wrap: balance;
+  letter-spacing: -0.015em;
+}
+html[lang="ar"] :where(h1, h2, h3),
+:where(h1, h2, h3)[lang="ar"],
+[lang="ar"] :where(h1, h2, h3) {
   line-height: 1.5;
   letter-spacing: 0;
 }
-:where(h1, h2, h3) {
-  text-wrap: balance;
-}
 p {
   text-wrap: pretty;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 :focus-visible {
@@ -181,49 +193,105 @@ p {
 }
 
 @layer components {
-  /* Standard elevated surface: thin border, soft depth. */
+  /*
+   * A grouped surface (menus, settings groups, the status panel). Flat: a hairline border, no
+   * shadow. Content lists use rules (.rule-list) instead.
+   */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    box-shadow: var(--elev-card);
+    border-radius: 12px;
   }
   .card-hover {
     transition:
-      transform 180ms ease,
-      box-shadow 180ms ease,
-      border-color 180ms ease;
+      border-color 150ms ease,
+      background-color 150ms ease;
   }
   .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--elev-lift);
     border-color: var(--border-strong);
   }
-  /* Glass is reserved for chrome that floats over content (top bar, overlays). */
-  .glass {
-    background: var(--glass);
-    @apply backdrop-blur-xl backdrop-saturate-150;
+  /* Floating chrome (menus, popovers): the only elevated surfaces. */
+  .pop {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--elev-pop);
   }
+  /* Sticky header: opaque enough to read, with a faint blur of what scrolls under it. */
+  .glass {
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    @apply backdrop-blur-md;
+  }
+  /* The one filled accent (primary action / active pill). Solid — never a gradient. */
   .brand-gradient {
-    background-image: linear-gradient(135deg, #8a55ff 0%, #713bff 45%, #5a4bff 100%);
+    background: var(--brand);
+    color: #fff;
   }
   .brand-gradient-soft {
-    background-image: linear-gradient(135deg, color-mix(in srgb, var(--brand) 22%, var(--surface)) 0%, var(--surface) 70%);
+    background: var(--accent-soft);
+  }
+  /* Section label: small, quiet, technical. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--subtle);
+  }
+  html[lang="ar"] .eyebrow {
+    font-family: var(--font-ar);
+    font-size: 0.8125rem;
+    letter-spacing: 0;
+    font-weight: 600;
+  }
+  /* Category label in story metadata: coloured text with a small mark — not a pill. */
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  /* Editorial lists separated by hairlines. */
+  .rule-list > * + * {
+    border-top: 1px solid var(--border);
   }
   .skeleton {
     background-image: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
     background-size: 200% 100%;
     animation: var(--animate-shimmer);
-    border-radius: 8px;
+    border-radius: 6px;
   }
   .live-dot {
-    animation: pulse-dot 2s ease-out infinite;
+    animation: pulse-dot 2.4s ease-out infinite;
   }
   .no-scrollbar {
     scrollbar-width: none;
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+  /* Headline link: underline on hover only, in the text colour. */
+  .headline-link {
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    transition: text-decoration-color 150ms ease;
+  }
+  .headline-link:hover {
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  }
+  /* Images ease in slightly on hover; reduced motion removes it below. */
+  .zoom-img {
+    transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .group:hover .zoom-img {
+    transform: scale(1.025);
   }
 }
 
@@ -233,5 +301,8 @@ p {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+  .group:hover .zoom-img {
+    transform: none;
   }
 }

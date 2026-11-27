@@ -21,6 +21,7 @@ export function Popover({
   badge,
   onOpenChange,
   width = "w-[340px]",
+  triggerClassName = "size-11 justify-center text-muted hover:text-fg",
 }: {
   label: string;
   trigger: ReactNode;
@@ -28,6 +29,7 @@ export function Popover({
   badge?: ReactNode;
   onOpenChange?: (open: boolean) => void;
   width?: string;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -72,7 +74,7 @@ export function Popover({
         title={label}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`relative inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 ${open ? "bg-surface-2" : ""}`}
+        className={`relative inline-flex h-11 items-center rounded-lg transition-colors hover:bg-surface-2 ${triggerClassName} ${open ? "bg-surface-2 text-fg" : ""}`}
       >
         {trigger}
         {badge}
@@ -81,8 +83,8 @@ export function Popover({
         role="dialog"
         aria-label={label}
         inert={!open}
-        className={`absolute end-0 top-[52px] z-50 ${width} max-w-[calc(100vw-24px)] max-md:fixed max-md:inset-x-3 max-md:top-14 max-md:w-auto max-md:max-w-none origin-top rounded-2xl border border-line bg-surface p-2 shadow-lift transition duration-150 ease-out rtl:origin-top-left ltr:origin-top-right ${
-          open ? "visible scale-100 opacity-100" : "invisible scale-95 opacity-0"
+        className={`pop absolute end-0 top-[50px] z-50 ${width} max-w-[calc(100vw-24px)] max-md:fixed max-md:inset-x-3 max-md:top-14 max-md:w-auto max-md:max-w-none origin-top p-1.5 transition duration-150 ease-out rtl:origin-top-left ltr:origin-top-right ${
+          open ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-1 scale-[0.98] opacity-0"
         }`}
       >
         {children(() => set(false))}
@@ -100,10 +102,24 @@ export function SearchBox({ className = "" }: { className?: string }) {
   const urlQuery = pathname === "/search" ? (sp.get("q") ?? "") : "";
   const [value, setValue] = useState(urlQuery);
   const [last, setLast] = useState(urlQuery);
+  const input = useRef<HTMLInputElement>(null);
   if (urlQuery !== last) {
     setLast(urlQuery);
     setValue(urlQuery);
   }
+  // "/" focuses the search field from anywhere except while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (!input.current || input.current.offsetParent === null) return;
+      e.preventDefault();
+      input.current.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
     <form
       role="search"
@@ -117,17 +133,21 @@ export function SearchBox({ className = "" }: { className?: string }) {
       <label htmlFor="global-search" className="sr-only">
         {t("top.searchLabel")}
       </label>
-      <Search className="pointer-events-none absolute start-4 top-1/2 size-[18px] -translate-y-1/2 text-subtle" aria-hidden />
+      <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-subtle" aria-hidden />
       <input
+        ref={input}
         id="global-search"
         type="search"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder={t("top.search")}
+        placeholder={t("top.searchShort")}
         autoComplete="off"
         dir="auto"
-        className="h-11 w-full rounded-full border border-line bg-surface pe-4 ps-11 text-[15px] text-fg shadow-card transition-colors placeholder:text-subtle hover:border-line-strong focus:border-accent focus:outline-none"
+        className="peer h-10 w-full rounded-lg border border-line bg-surface pe-9 ps-9 text-sm text-fg transition-colors placeholder:text-subtle hover:border-line-strong focus:border-accent focus:outline-none"
       />
+      <kbd className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 rounded border border-line px-1.5 font-mono text-[11px] leading-5 text-subtle peer-focus:hidden" aria-hidden>
+        /
+      </kbd>
     </form>
   );
 }
@@ -185,10 +205,10 @@ export function Notifications() {
           writeSeen(Date.now());
         }
       }}
-      trigger={<Bell className="size-5" aria-hidden />}
+      trigger={<Bell className="size-[18px]" aria-hidden />}
       badge={
         unseen > 0 ? (
-          <span className="absolute end-0.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-bg">
+          <span className="absolute end-1 top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold leading-4 text-white ring-2 ring-bg">
             <span className="sr-only">{t("top.notifNew", { n: unseen })}</span>
             <span aria-hidden>{unseen}</span>
           </span>
@@ -215,7 +235,7 @@ export function Notifications() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => markRead(s.leadArticleId, s.url)}
-                      className="flex gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-surface-2"
+                      className="flex gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-surface-2"
                     >
                       <span className={`mt-2 size-2 shrink-0 rounded-full ${s.breaking ? "bg-breaking" : fresh ? "bg-brand" : "bg-line-strong"}`} aria-hidden />
                       <span className="min-w-0">
@@ -255,8 +275,8 @@ export function ProfileMenu() {
       label={t("top.profile")}
       width="w-[300px]"
       trigger={
-        <span className="inline-flex size-9 items-center justify-center rounded-full brand-gradient text-white shadow-sm">
-          <UserRound className="size-5" aria-hidden />
+        <span className="inline-flex size-8 items-center justify-center rounded-full border border-line bg-surface-2 text-muted">
+          <UserRound className="size-4" aria-hidden />
         </span>
       }
     >
@@ -269,7 +289,7 @@ export function ProfileMenu() {
           <ul className="border-t border-line pt-1.5">
             {links.map(({ href, label, icon: Icon }) => (
               <li key={href}>
-                <Link href={href} onClick={close} className="flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm text-fg transition-colors hover:bg-surface-2">
+                <Link href={href} onClick={close} className="flex min-h-10 items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-fg transition-colors hover:bg-surface-2">
                   <Icon className="size-4 text-muted" aria-hidden />
                   {label}
                 </Link>

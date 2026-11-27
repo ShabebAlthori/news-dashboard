@@ -22,7 +22,7 @@ export const SECTIONS: { id: Section; en: string; ar: string }[] = [
  */
 export const CATEGORIES: CategoryDef[] = [
   // Technology
-  { id: "data", section: "tech", en: "Data Science & Analytics", ar: "علم البيانات والتحليلات" },
+  { id: "data", section: "tech", en: "Data & Analytics", ar: "البيانات والتحليلات" },
   { id: "ai", section: "tech", en: "AI & Artificial Intelligence", ar: "الذكاء الاصطناعي" },
   { id: "dev", section: "tech", en: "Programming & Open Source", ar: "البرمجة والمصادر المفتوحة" },
   { id: "security", section: "tech", en: "Cybersecurity & Hacking", ar: "الأمن السيبراني والاختراق" },
@@ -73,8 +73,32 @@ export interface PriorityCategory {
   topics: string[];
 }
 
+/** One-line description of each category (category pages). */
+export const CATEGORY_ABOUT: Record<string, { en: string; ar: string }> = {
+  data: {
+    en: "Data platforms, analytics and BI, data engineering, and the databases underneath them.",
+    ar: "منصات البيانات والتحليلات وذكاء الأعمال وهندسة البيانات وقواعد البيانات التي تقوم عليها.",
+  },
+  ai: { en: "Models, research, products and policy across artificial intelligence.", ar: "النماذج والأبحاث والمنتجات والسياسات في عالم الذكاء الاصطناعي." },
+  business: {
+    en: "Earnings, deals, funding, leadership changes and strategy at technology companies.",
+    ar: "النتائج المالية والصفقات والتمويل وتغييرات القيادة واستراتيجيات شركات التقنية.",
+  },
+  dev: { en: "Languages, frameworks, developer tools and open-source projects.", ar: "لغات البرمجة وأطر العمل وأدوات المطوّرين ومشاريع المصادر المفتوحة." },
+  security: { en: "Breaches, vulnerabilities, threat research and the tools that defend against them.", ar: "الاختراقات والثغرات وأبحاث التهديدات وأدوات الحماية منها." },
+  "hardware-gaming": {
+    en: "CPUs, GPUs and PC hardware, consoles, games and the games industry.",
+    ar: "المعالجات وبطاقات الرسوميات وعتاد الحاسوب، والمنصات المنزلية والألعاب وصناعتها.",
+  },
+  saudi: { en: "Technology, startups and digital transformation in Saudi Arabia.", ar: "التقنية والشركات الناشئة والتحوّل الرقمي في المملكة العربية السعودية." },
+  robotics: {
+    en: "Robots, drones, autonomous machines and the electronics behind them.",
+    ar: "الروبوتات والطائرات المسيّرة والآلات ذاتية التشغيل والإلكترونيات التي تقف خلفها.",
+  },
+};
+
 export const PRIORITY_CATEGORIES: PriorityCategory[] = [
-  { id: "data", en: "Data Science & Analytics", ar: "علم البيانات والتحليلات", topics: ["data"] },
+  { id: "data", en: "Data & Analytics", ar: "البيانات والتحليلات", topics: ["data"] },
   { id: "ai", en: "AI & Artificial Intelligence", ar: "الذكاء الاصطناعي", topics: ["ai"] },
   {
     id: "business",
@@ -91,7 +115,7 @@ export const PRIORITY_CATEGORIES: PriorityCategory[] = [
     topics: ["hardware", "chips", "pc-gaming", "consoles", "releases", "game-industry", "gaming-hardware", "platforms", "engines", "esports-business"],
   },
   { id: "saudi", en: "Saudi Technology & Startups", ar: "التقنية والشركات الناشئة في السعودية", topics: ["saudi"] },
-  { id: "robotics", en: "Robotics", ar: "الروبوتات", topics: ["robotics"] },
+  { id: "robotics", en: "Robotics & Electronics", ar: "الروبوتات والإلكترونيات", topics: ["robotics"] },
 ];
 
 export const PRIORITY_IDS = PRIORITY_CATEGORIES.map((c) => c.id);
@@ -126,7 +150,7 @@ export const DASHBOARD_CHIPS: { id: string; en: string; ar: string }[] = [
   { id: "business", en: "Business", ar: "الأعمال" },
   { id: "dev", en: "Programming", ar: "البرمجة" },
   { id: "security", en: "Cybersecurity", ar: "الأمن السيبراني" },
-  { id: "hardware-gaming", en: "Gaming", ar: "الألعاب" },
+  { id: "hardware-gaming", en: "Hardware & Gaming", ar: "العتاد والألعاب" },
   { id: "saudi", en: "Saudi Tech", ar: "التقنية السعودية" },
   { id: "robotics", en: "Robotics", ar: "الروبوتات" },
 ];

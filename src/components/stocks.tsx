@@ -60,7 +60,7 @@ function Change({ q, muted = false, className = "" }: { q: StockQuote; muted?: b
   const { dir, pct } = direction(q);
   const color = muted || dir === "flat" ? "text-muted" : dir === "up" ? "text-ok" : "text-breaking";
   return (
-    <span dir="ltr" className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold tabular-nums ${color} ${className}`}>
+    <span dir="ltr" className={`inline-flex items-center gap-1 whitespace-nowrap font-mono text-[13.5px] font-medium tabular-nums ${color} ${className}`}>
       <span className="text-[0.75em]" aria-hidden>
         {dir === "up" ? "▲" : dir === "down" ? "▼" : "–"}
       </span>
@@ -127,12 +127,12 @@ export function StocksCard() {
   const stale = !!quotes && now - Date.parse(oldestFetch(quotes) ?? data!.generatedAt) > STOCKS_STALE_MS;
 
   return (
-    <section className="card p-5" aria-labelledby="stocks-title" aria-busy={!quotes}>
+    <section className="border-t border-line pt-4" aria-labelledby="stocks-title" aria-busy={!quotes}>
       <PanelTitle
         id="stocks-title"
         icon={
           <IconBubble>
-            <ChartCandlestick className="size-[18px]" aria-hidden />
+            <ChartCandlestick className="size-4" aria-hidden />
           </IconBubble>
         }
         title={t("stocks.title")}
@@ -144,10 +144,10 @@ export function StocksCard() {
               const name = companyName(q, lang);
               const body = (
                 <>
-                  <CompanyLogo id={q.companyId ?? q.symbol} size={36} />
+                  <CompanyLogo id={q.companyId ?? q.symbol} size={32} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold leading-5 text-fg">{name}</span>
-                    <span className="block text-xs text-subtle">
+                    <span className="block truncate text-[15px] font-medium leading-5 text-fg">{name}</span>
+                    <span className="block font-mono text-xs text-subtle">
                       <span dir="ltr">{q.symbol}</span>
                     </span>
                   </span>
@@ -157,7 +157,7 @@ export function StocksCard() {
               return (
                 <li key={q.symbol}>
                   {q.companyId ? (
-                    <Link href={`/companies?co=${q.companyId}`} aria-label={spoken(q)} className={`${ROW} -mx-2 rounded-lg px-2 transition-colors hover:bg-surface-2`}>
+                    <Link href={`/companies?co=${q.companyId}`} aria-label={spoken(q)} className={`${ROW} -mx-2 rounded-lg px-2 transition-colors hover:bg-surface`}>
                       {body}
                     </Link>
                   ) : (
@@ -200,7 +200,7 @@ export function StocksView() {
   const stale = quotes.length > 0 && now - Date.parse(oldestFetch(quotes) ?? data!.generatedAt) > STOCKS_STALE_MS;
   const names = new Intl.ListFormat(lang === "ar" ? "ar" : "en", { type: "conjunction" });
 
-  const header = <PageHeader title={t("page.stocks.title")} subtitle={t("page.stocks.subtitle")} icon={<IconBubble><ChartCandlestick className="size-[18px]" aria-hidden /></IconBubble>} />;
+  const header = <PageHeader eyebrow={t("nav.companies")} title={t("page.stocks.title")} subtitle={t("page.stocks.subtitle")} />;
   if (!prefs || (isLoading && !data)) {
     return (
       <>
@@ -234,7 +234,7 @@ export function StocksView() {
   return (
     <>
       {header}
-      <section className="card p-5" aria-label={t("page.stocks.title")}>
+      <section aria-label={t("page.stocks.title")}>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-line text-xs text-muted">
@@ -265,7 +265,7 @@ export function StocksView() {
                 </td>
                 <td className="py-1.5 text-end">
                   {quote ? (
-                    <span dir="ltr" className="whitespace-nowrap tabular-nums text-fg">
+                    <span dir="ltr" className="whitespace-nowrap font-mono text-[13.5px] tabular-nums text-fg">
                       {formatPrice(quote.price, quote.currency)}
                     </span>
                   ) : (

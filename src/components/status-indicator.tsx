@@ -8,6 +8,7 @@ import { requestRefresh } from "@/lib/client/actions";
 import { IS_STATIC } from "@/lib/client/mode";
 import { dataFreshness, formatAge, type Freshness } from "@/lib/shared/freshness";
 import { useNow, useUi } from "./providers";
+import { Popover } from "./top-bar";
 import { useStatus } from "./use-data";
 
 /** Manual refresh: starts a server refresh (or, in the web edition, reloads the latest published data). */
@@ -73,7 +74,7 @@ export function StaleNotice() {
   return (
     <div
       role="status"
-      className={`mb-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${red ? "border-breaking/40 bg-breaking-soft text-fg" : "border-caution/40 bg-caution-soft text-fg"}`}
+      className={`mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${red ? "border-breaking/35 bg-breaking-soft text-fg" : "border-caution/35 bg-caution-soft text-fg"}`}
     >
       <Clock className={`mt-0.5 size-4 shrink-0 ${red ? "text-breaking" : "text-caution"}`} aria-hidden />
       <p>
@@ -122,7 +123,7 @@ export function StatusCard({ rail = false }: { rail?: boolean }) {
   }
 
   return (
-    <div className="card px-3.5 py-3">
+    <div className="rounded-lg border border-line bg-surface px-3.5 py-3">
       <div className="flex items-center gap-3">
         <span className={`size-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
         <div className="min-w-0 flex-1 leading-tight" aria-live="polite" title={exact}>
@@ -139,5 +140,32 @@ export function StatusCard({ rail = false }: { rail?: boolean }) {
       {failing > 0 && !running && <p className="mt-2 text-xs leading-5 text-caution">{t("status.failing", { n: failing })}</p>}
       {note && <p className="mt-2 text-xs leading-5 text-muted">{note}</p>}
     </div>
+  );
+}
+
+/** Header status: a coloured dot and the last update time; opens the full status panel. */
+export function StatusPill() {
+  const { t, lang } = useUi();
+  const now = useNow(30_000);
+  const { data: status } = useStatus();
+  const fresh = dataFreshness(shownSince(status), status?.intervalMinutes, now);
+  const dot = !status ? "bg-subtle" : status.running ? "bg-accent animate-pulse" : freshnessDot(fresh, status.sources.failing);
+  const short = status?.lastSuccessAt ? formatRelative(status.lastSuccessAt, lang, now) : t("status.never");
+  return (
+    <Popover
+      label={`${t("status.lastUpdated")}: ${short}`}
+      width="w-[300px]"
+      triggerClassName="gap-2 px-2.5 text-[13px] text-muted hover:text-fg"
+      trigger={
+        <>
+          <span className={`size-2 shrink-0 rounded-full ${dot}`} aria-hidden />
+          <span className="max-w-[9rem] truncate" aria-hidden>
+            {short}
+          </span>
+        </>
+      }
+    >
+      {() => <StatusCard />}
+    </Popover>
   );
 }

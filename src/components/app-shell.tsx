@@ -1,84 +1,73 @@
 "use client";
 
-import { Bookmark, Building2, ChartColumn, Cpu, Gamepad2, House, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, X, Zap } from "lucide-react";
+import { Bookmark, Building2, CalendarDays, ChartNoAxesColumn, House, Menu, Search, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import type { I18nKey } from "@/lib/shared/i18n";
-import { Brand, TechPulseMark } from "./brand";
-import { LanguageToggle, ThemeSwitch } from "./controls";
+import { PRIORITY_IDS, shortCategoryLabel } from "@/lib/shared/taxonomy";
+import { Brand } from "./brand";
+import { LanguageToggle, ThemeButton, ThemeSwitch } from "./controls";
 import { useUi } from "./providers";
-import { StaleNotice, StatusCard } from "./status-indicator";
+import { StaleNotice, StatusCard, StatusPill } from "./status-indicator";
 import { IS_STATIC, BASE_PATH } from "@/lib/client/mode";
 import { Notifications, ProfileMenu, SearchBox } from "./top-bar";
 
-const NAV: { href: string; key: I18nKey; icon: typeof House }[] = [
+type NavItem = { href: string; key: I18nKey; icon: typeof House };
+
+/** Primary destinations (header on desktop, drawer on smaller screens). */
+const PRIMARY: NavItem[] = [
   { href: "/", key: "nav.dashboard", icon: House },
   { href: "/latest", key: "nav.latest", icon: Zap },
-  { href: "/radar", key: "nav.radar", icon: ChartColumn },
-  { href: "/technology", key: "nav.technology", icon: Cpu },
-  { href: "/gaming", key: "nav.gaming", icon: Gamepad2 },
+  { href: "/radar", key: "nav.radar", icon: ChartNoAxesColumn },
   { href: "/companies", key: "nav.companies", icon: Building2 },
+  { href: "/report", key: "nav.report", icon: CalendarDays },
   { href: "/saved", key: "nav.saved", icon: Bookmark },
-  { href: "/settings", key: "nav.settings", icon: Settings },
 ];
 
-const MOBILE_TABS = ["/", "/latest", "/radar", "/technology", "/saved"];
+/** Everything else (drawer and footer). */
+const SECONDARY: { href: string; key: I18nKey }[] = [
+  { href: "/technology", key: "nav.technology" },
+  { href: "/gaming", key: "nav.gaming" },
+  { href: "/stocks", key: "nav.stocks" },
+  { href: "/search", key: "nav.search" },
+  { href: "/settings", key: "nav.settings" },
+];
+
+/** Bottom tabs on phones. */
+const TABS: { href: string; icon: typeof House }[] = [
+  { href: "/", icon: House },
+  { href: "/latest", icon: Zap },
+  { href: "/radar", icon: ChartNoAxesColumn },
+  { href: "/companies", icon: Building2 },
+  { href: "/saved", icon: Bookmark },
+];
+
+export const categoryHref = (id: string) => `/category/${id}`;
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// Desktop sidebar collapse preference (per browser).
-const COLLAPSE_KEY = "techpulse.sidebarCollapsed";
-const collapseListeners = new Set<() => void>();
-function readCollapsed() {
-  try {
-    return window.localStorage.getItem(COLLAPSE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-function writeCollapsed(v: boolean) {
-  try {
-    window.localStorage.setItem(COLLAPSE_KEY, v ? "1" : "0");
-  } catch {
-    // ignore: the sidebar simply opens expanded next time
-  }
-  for (const l of collapseListeners) l();
-}
-function subscribeCollapsed(l: () => void) {
-  collapseListeners.add(l);
-  return () => collapseListeners.delete(l);
-}
-
-/**
- * Navigation links. `rail` = icons only (tablet, or a collapsed desktop sidebar);
- * `responsiveRail` = icons only below 1280px and full labels above.
- */
-function NavLinks({ mode, onNavigate }: { mode: "full" | "rail" | "responsive"; onNavigate?: () => void }) {
+/** Desktop primary navigation: quiet text links, the current page on a subtle surface. */
+function PrimaryNav() {
   const pathname = usePathname();
   const { t } = useUi();
-  const labelClass = mode === "full" ? "" : mode === "rail" ? "sr-only" : "sr-only xl:not-sr-only";
-  const itemClass = mode === "full" ? "px-3.5" : mode === "rail" ? "justify-center px-0" : "justify-center px-0 xl:justify-start xl:px-3.5";
   return (
-    <nav aria-label={t("nav.menu")}>
-      <ul className="space-y-1">
-        {NAV.map(({ href, key, icon: Icon }) => {
+    <nav aria-label={t("nav.primary")} className="hidden lg:block">
+      <ul className="flex items-center">
+        {PRIMARY.map(({ href, key }) => {
           const active = isActive(pathname, href);
           return (
             <li key={href}>
-              <Link
-                href={href}
-                onClick={onNavigate}
-                aria-current={active ? "page" : undefined}
-                title={mode === "full" ? undefined : t(key)}
-                className={`group flex h-11 items-center gap-3.5 rounded-xl text-[15px] transition-colors ${itemClass} ${
-                  active ? "brand-gradient font-semibold text-white shadow-[0_8px_24px_-10px_rgba(113,59,255,0.7)]" : "text-muted hover:bg-surface-2 hover:text-fg"
-                }`}
-              >
-                <Icon className={`size-5 shrink-0 ${active ? "" : "text-subtle group-hover:text-fg"}`} aria-hidden />
-                <span className={labelClass}>{t(key)}</span>
+              <Link href={href} aria-current={active ? "page" : undefined} title={t(key)} className="group inline-flex h-11 items-center px-0.5">
+                <span
+                  className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                    active ? "bg-surface-2 font-medium text-fg" : "text-muted group-hover:text-fg"
+                  }`}
+                >
+                  {t(`tab.${href}` as I18nKey)}
+                </span>
               </Link>
             </li>
           );
@@ -88,70 +77,105 @@ function NavLinks({ mode, onNavigate }: { mode: "full" | "rail" | "responsive"; 
   );
 }
 
-function Sidebar() {
-  const { t } = useUi();
-  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
-  // md–lg: always a rail. xl+: full unless the reader collapsed it.
-  const mode = collapsed ? "rail" : "responsive";
+/** The eight categories, each with its own page. Scrolls sideways on small screens. */
+function CategoryNav() {
+  const pathname = usePathname();
+  const { t, lang } = useUi();
   return (
-    <aside
-      className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-e border-line bg-sidebar py-5 transition-[width] duration-200 md:flex ${
-        collapsed ? "w-[84px] px-3" : "w-[84px] px-3 xl:w-[256px] xl:px-4"
-      }`}
-    >
-      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-center xl:justify-between"} gap-2 px-1`}>
-        <span className={collapsed ? "" : "xl:hidden"}>
-          <Link href="/" aria-label={t("app.name")} className="rounded-lg">
-            <TechPulseMark className="size-10" />
-          </Link>
-        </span>
-        {!collapsed && (
-          <span className="hidden xl:block">
-            <Brand />
-          </span>
-        )}
+    <nav aria-label={t("nav.categories")} className="border-b border-line">
+      <div className="no-scrollbar mx-auto max-w-[1320px] overflow-x-auto px-4 sm:px-6 lg:px-8">
+        <ul className="flex w-max items-center gap-1 sm:gap-2">
+          {PRIORITY_IDS.map((id) => {
+            const href = categoryHref(id);
+            const active = isActive(pathname, href);
+            return (
+              <li key={id}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative inline-flex h-11 items-center whitespace-nowrap px-2 text-[13.5px] transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:content-[''] ${
+                    active ? "font-medium text-fg after:bg-accent" : "text-muted hover:text-fg after:bg-transparent"
+                  }`}
+                >
+                  {shortCategoryLabel(id)?.[lang] ?? id}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
-
-      <div className="mt-8 flex-1 overflow-y-auto overflow-x-hidden">
-        <NavLinks mode={mode} />
-      </div>
-
-      <div className="mt-4 space-y-3">
-        <div className={collapsed ? "flex justify-center" : "flex justify-center xl:block"}>
-          <span className={collapsed ? "" : "xl:hidden"}>
-            <ThemeSwitch rail />
-          </span>
-          {!collapsed && (
-            <span className="hidden xl:block">
-              <ThemeSwitch />
-            </span>
-          )}
-        </div>
-        <div className={collapsed ? "" : "xl:hidden"}>
-          <StatusCard rail />
-        </div>
-        {!collapsed && (
-          <div className="hidden xl:block">
-            <StatusCard />
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => writeCollapsed(!collapsed)}
-          className="hidden h-9 w-full items-center justify-center gap-2 rounded-lg text-xs text-subtle transition-colors hover:bg-surface-2 hover:text-fg xl:flex"
-          aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
-          title={collapsed ? t("nav.expand") : t("nav.collapse")}
-        >
-          {collapsed ? <PanelLeftOpen className="size-4 rtl:-scale-x-100" aria-hidden /> : <PanelLeftClose className="size-4 rtl:-scale-x-100" aria-hidden />}
-          {!collapsed && <span>{t("nav.collapse")}</span>}
-        </button>
-      </div>
-    </aside>
+    </nav>
   );
 }
 
 function SearchFallback() {
-  return <div className="h-11 w-full rounded-full border border-line bg-surface" aria-hidden />;
+  return <div className="h-10 w-full rounded-lg border border-line bg-surface" aria-hidden />;
+}
+
+function IconLink({ href, label, children }: { href: string; label: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="inline-flex size-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg" aria-label={label} title={label}>
+      {children}
+    </Link>
+  );
+}
+
+function Footer() {
+  const { t, lang } = useUi();
+  const heading = "mb-3 text-sm font-medium text-fg";
+  const link = "inline-flex min-h-9 items-center text-sm text-muted transition-colors hover:text-fg";
+  return (
+    <footer className="mt-16 border-t border-line bg-bg-2">
+      <div className="mx-auto grid max-w-[1320px] grid-cols-1 gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] lg:px-8">
+        <div className="max-w-sm space-y-4">
+          <Brand tagline={false} />
+          <p className="text-sm leading-relaxed text-muted">{t("footer.tagline")}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <ThemeSwitch />
+          </div>
+        </div>
+        <div>
+          <h2 className={heading}>{t("footer.read")}</h2>
+          <ul>
+            {[...PRIMARY.slice(1, 5), ...SECONDARY.slice(0, 3)].map(({ href, key }) => (
+              <li key={href}>
+                <Link href={href} className={link}>
+                  {t(key)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h2 className={heading}>{t("nav.categories")}</h2>
+          <ul>
+            {PRIORITY_IDS.map((id) => (
+              <li key={id}>
+                <Link href={categoryHref(id)} className={link}>
+                  {shortCategoryLabel(id)?.[lang] ?? id}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h2 className={heading}>{t("footer.you")}</h2>
+          <ul>
+            {[PRIMARY[5], ...SECONDARY.slice(3)].map(({ href, key }) => (
+              <li key={href}>
+                <Link href={href} className={link}>
+                  {t(key)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-line">
+        <p className="mx-auto max-w-[1320px] px-4 py-5 text-xs text-subtle sm:px-6 lg:px-8">{t("footer.note")}</p>
+      </div>
+    </footer>
+  );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -180,109 +204,137 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [drawerOpen]);
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex min-h-dvh flex-col">
       <a href="#content" className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-[60] focus:rounded focus:bg-surface focus:px-3 focus:py-2">
         {t("nav.skip")}
       </a>
 
-      {/* Sidebar on the start side: left in English, right in Arabic. */}
-      <Sidebar />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar — tablet and desktop */}
-        <header className="glass sticky top-0 z-30 hidden items-center gap-4 border-b border-line/60 px-6 py-3 md:flex lg:px-8">
-          <Suspense fallback={<SearchFallback />}>
-            <SearchBox className="max-w-[640px] flex-1" />
-          </Suspense>
-          <div className="ms-auto flex items-center gap-2">
-            <LanguageToggle />
-            <span className="mx-1 h-7 w-px bg-line" aria-hidden />
-            <Notifications />
-            <ProfileMenu />
-          </div>
-        </header>
-
-        {/* Top bar — phones */}
-        <header className="glass sticky top-0 z-30 flex items-center justify-between gap-1 border-b border-line/60 px-2 py-1.5 md:hidden">
-          {/* The wordmark needs ~110px: shown only when the five 44px controls still fit beside it. */}
-          <span className="min-[440px]:hidden">
-            <Brand compact />
-          </span>
-          <span className="hidden min-[440px]:block">
+      {/* Header: one compact row, sticky. */}
+      <header className="glass sticky top-0 z-30 border-b border-line">
+        <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-2 px-2 sm:px-4 md:h-[60px] lg:gap-4 lg:px-8">
+          <span className="ps-1 sm:ps-0">
             <Brand tagline={false} />
           </span>
-          <div className="flex items-center gap-0.5">
-            <Link href="/search" className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2" aria-label={t("nav.search")}>
-              <Search className="size-5" aria-hidden />
-            </Link>
+          <PrimaryNav />
+          <div className="ms-auto flex items-center gap-0.5 sm:gap-1">
+            <Suspense fallback={<SearchFallback />}>
+              <SearchBox className="hidden w-[220px] xl:block 2xl:w-[280px]" />
+            </Suspense>
+            <span className="xl:hidden">
+              <IconLink href="/search" label={t("nav.search")}>
+                <Search className="size-[18px]" aria-hidden />
+              </IconLink>
+            </span>
+            <span className="hidden lg:block">
+              <StatusPill />
+            </span>
             <LanguageToggle compact />
+            <span className="hidden md:block">
+              <ThemeButton />
+            </span>
             <Notifications />
+            <span className="hidden md:block">
+              <ProfileMenu />
+            </span>
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-lg text-fg hover:bg-surface-2 lg:hidden"
               aria-label={t("nav.menu")}
               aria-expanded={drawerOpen}
             >
               <Menu className="size-5" aria-hidden />
             </button>
           </div>
-        </header>
+        </div>
+      </header>
+      <CategoryNav />
 
-        <main id="content" className="mx-auto w-full max-w-[1480px] flex-1 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 md:pb-12 md:pt-6 lg:px-8">
-          <StaleNotice />
-          {children}
-        </main>
+      <main id="content" className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-8">
+        <StaleNotice />
+        {children}
+      </main>
 
-        {/* Bottom navigation — phones */}
-        {/* Opaque, so list text never shows through the labels; padded above the home indicator. */}
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-sidebar pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.5)] md:hidden" aria-label={t("nav.menu")}>
-          <ul className="grid grid-cols-5">
-            {NAV.filter((n) => MOBILE_TABS.includes(n.href)).map(({ href, icon: Icon }) => {
-              const active = isActive(pathname, href);
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    aria-current={active ? "page" : undefined}
-                    className={`flex min-h-14 flex-col items-center gap-1 px-1 pb-2 pt-2.5 text-xs ${active ? "font-semibold text-accent" : "text-muted"}`}
-                  >
-                    <span className={`inline-flex h-7 w-12 items-center justify-center rounded-full transition-colors ${active ? "bg-accent-soft" : ""}`}>
-                      <Icon className="size-5" aria-hidden />
-                    </span>
-                    <span className="max-w-full truncate">{t(`tab.${href}` as I18nKey)}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+      <div className="pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">
+        <Footer />
       </div>
 
-      {/* Drawer — phones */}
-      <div className={`fixed inset-0 z-40 md:hidden ${drawerOpen ? "" : "pointer-events-none"}`} role="dialog" aria-modal="true" aria-label={t("nav.menu")} inert={!drawerOpen}>
+      {/* Bottom tabs — phones. Opaque, padded above the home indicator. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg-2 pb-[env(safe-area-inset-bottom)] md:hidden" aria-label={t("nav.tabs")}>
+        <ul className="grid grid-cols-5">
+          {TABS.map(({ href, icon: Icon }) => {
+            const active = isActive(pathname, href);
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11.5px] leading-none ${active ? "font-medium text-fg" : "text-subtle"}`}
+                >
+                  <Icon className={`size-5 ${active ? "text-accent" : ""}`} aria-hidden />
+                  <span className="max-w-full truncate">{t(`tab.${href}` as I18nKey)}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {/* Drawer — below the desktop breakpoint. */}
+      <div className={`fixed inset-0 z-40 overflow-hidden lg:hidden ${drawerOpen ? "" : "pointer-events-none"}`} role="dialog" aria-modal="true" aria-label={t("nav.menu")} inert={!drawerOpen}>
         <button
           type="button"
           tabIndex={-1}
-          className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-200 ${drawerOpen ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 bg-[var(--scrim)] transition-opacity duration-200 ${drawerOpen ? "opacity-100" : "opacity-0"}`}
           aria-label={t("nav.close")}
           onClick={() => setDrawerOpen(false)}
         />
         <div
-          className={`absolute inset-y-0 end-0 flex w-[300px] max-w-[86%] flex-col border-s border-line bg-sidebar p-4 shadow-lift transition-transform duration-200 ease-out ${
+          className={`absolute inset-y-0 end-0 flex w-[320px] max-w-[88%] flex-col border-s border-line bg-bg-2 transition-transform duration-200 ease-out ${
             drawerOpen ? "translate-x-0" : "ltr:translate-x-full rtl:-translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <Brand onNavigate={() => setDrawerOpen(false)} />
-            <button type="button" onClick={() => setDrawerOpen(false)} className="inline-flex size-11 items-center justify-center rounded-full hover:bg-surface-2" aria-label={t("nav.close")}>
+          <div className="flex h-14 items-center justify-between border-b border-line px-4">
+            <Brand tagline={false} onNavigate={() => setDrawerOpen(false)} />
+            <button type="button" onClick={() => setDrawerOpen(false)} className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-surface-2" aria-label={t("nav.close")}>
               <X className="size-5" aria-hidden />
             </button>
           </div>
-          <div className="mt-6 flex-1 overflow-y-auto">
-            <NavLinks mode="full" onNavigate={() => setDrawerOpen(false)} />
+          <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+            <nav aria-label={t("nav.primary")}>
+              <ul>
+                {PRIMARY.map(({ href, key, icon: Icon }) => {
+                  const active = isActive(pathname, href);
+                  return (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        onClick={() => setDrawerOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex h-11 items-center gap-3 rounded-lg px-3 text-[15px] ${active ? "bg-surface-2 font-medium text-fg" : "text-muted hover:bg-surface-2 hover:text-fg"}`}
+                      >
+                        <Icon className={`size-[18px] ${active ? "text-accent" : ""}`} aria-hidden />
+                        {t(key)}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+            <div>
+              <p className="eyebrow px-3 pb-2">{t("footer.more")}</p>
+              <ul>
+                {SECONDARY.map(({ href, key }) => (
+                  <li key={href}>
+                    <Link href={href} onClick={() => setDrawerOpen(false)} className="flex h-11 items-center rounded-lg px-3 text-[15px] text-muted hover:bg-surface-2 hover:text-fg">
+                      {t(key)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="space-y-3 pt-4">
+          <div className="space-y-3 border-t border-line p-4">
             <ThemeSwitch />
             <StatusCard />
           </div>

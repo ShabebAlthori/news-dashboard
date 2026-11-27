@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
-import "@fontsource-variable/inter";
-// Arabic glyphs only (Latin text, including inside Arabic, uses Inter), in the three weights the
-// UI uses; medium (500) falls back to regular. Both packages use font-display: swap.
+// Geist (one variable file per script; only Latin is downloaded for Latin text) for the
+// interface and headlines, Geist Mono for technical metadata. Arabic glyphs use IBM Plex Sans
+// Arabic in the three weights the UI uses (Latin inside Arabic text stays in Geist).
+// All packages use font-display: swap.
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
 import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
 import "@fontsource/ibm-plex-sans-arabic/arabic-700.css";
@@ -21,8 +24,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f3f4fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#090b18" },
+    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0c10" },
   ],
 };
 

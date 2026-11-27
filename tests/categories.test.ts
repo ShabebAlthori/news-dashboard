@@ -9,16 +9,16 @@ import { INTEREST_IDS, PRIORITY_CATEGORIES, PRIORITY_IDS, primaryCategory, topic
 import { DEFAULT_PREFS, type Prefs, type SnapshotStory } from "@/lib/shared/types";
 
 describe("priority categories", () => {
-  it("are exactly the eight requested categories, in order", () => {
+  it("are exactly the eight requested categories, in order (Data & Analytics first)", () => {
     expect(PRIORITY_CATEGORIES.map((c) => c.en)).toEqual([
-      "Data Science & Analytics",
+      "Data & Analytics",
       "AI & Artificial Intelligence",
       "Business & Financial Results",
       "Programming & Open Source",
       "Cybersecurity & Hacking",
       "PC Hardware & Gaming",
       "Saudi Technology & Startups",
-      "Robotics",
+      "Robotics & Electronics",
     ]);
   });
 

@@ -16,8 +16,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: `${BASE}/`,
     display: "standalone",
     dir: "auto",
-    background_color: "#090b18",
-    theme_color: "#090b18",
+    background_color: "#0b0c10",
+    theme_color: "#0b0c10",
     categories: ["news", "technology"],
     icons: [
       { src: `${BASE}/icons/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },

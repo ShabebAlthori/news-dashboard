@@ -3,14 +3,13 @@
 import { ArrowRight, CalendarDays, FileText } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useId } from "react";
 import useSWR from "swr";
 import { formatDateTime, formatRelative } from "@/lib/shared/format";
 import { companyById, shortCategoryLabel } from "@/lib/shared/taxonomy";
 import type { Lang, ReportResponse, ReportStory, WeeklyReport } from "@/lib/shared/types";
 import { CompanyLogo } from "./logos";
 import { useNow, useUi } from "./providers";
-import { RadarItemCard } from "./radar-view";
+import { RadarTimeline } from "./radar-view";
 import { EmptyState, ErrorState, PageHeader } from "./states";
 import { storyHeadline, storySummary } from "./story-text";
 import { CATEGORY_ICONS, categoryTint, OriginalLangTag } from "./story-visuals";
@@ -26,55 +25,6 @@ export function formatPeriod(start: string, end: string, lang: Lang) {
 }
 
 /** Original illustration: layered data plates with a rising chart, drawn in SVG. */
-export function ReportArt({ className = "" }: { className?: string }) {
-  const id = useId();
-  const plate = (y: number, opacity: number) => (
-    <g opacity={opacity}>
-      <path d={`M80 ${y - 20} L124 ${y} L80 ${y + 20} L36 ${y} Z`} fill={`url(#${id}-top)`} stroke="#9fb8ff" strokeOpacity="0.55" strokeWidth="1" />
-      <path d={`M36 ${y} L80 ${y + 20} L80 ${y + 28} L36 ${y + 8} Z`} fill="#2a1b78" />
-      <path d={`M124 ${y} L80 ${y + 20} L80 ${y + 28} L124 ${y + 8} Z`} fill="#1d1560" />
-      <path d={`M44 ${y} L80 ${y + 16} L116 ${y}`} fill="none" stroke="#7cf3ff" strokeOpacity="0.35" strokeWidth="1" />
-    </g>
-  );
-  return (
-    <svg viewBox="0 0 160 160" className={className} aria-hidden>
-      <defs>
-        <linearGradient id={`${id}-top`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#5c3bff" />
-          <stop offset="1" stopColor="#3a7bff" />
-        </linearGradient>
-        <radialGradient id={`${id}-glow`} cx="0.5" cy="0.6" r="0.5">
-          <stop offset="0" stopColor="#8a6bff" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#8a6bff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="80" cy="112" rx="72" ry="34" fill={`url(#${id}-glow)`} />
-      {plate(116, 0.75)}
-      {plate(96, 0.9)}
-      {plate(76, 1)}
-      {/* bars on the top plate */}
-      {[
-        [62, 70, 14],
-        [74, 76, 24],
-        [86, 82, 34],
-        [98, 76, 46],
-      ].map(([x, y, h], i) => (
-        <rect key={i} x={x - 3.5} y={y - h} width="7" height={h} rx="1.5" fill="#bfe9ff" fillOpacity={0.55 + i * 0.12} />
-      ))}
-      <path d="M56 58 L70 50 L84 44 L100 28" fill="none" stroke="#7cf3ff" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="100" cy="28" r="3.5" fill="#7cf3ff" />
-      {[
-        [26, 40],
-        [136, 52],
-        [130, 132],
-        [22, 120],
-        [118, 18],
-      ].map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i % 2 ? 1.6 : 1.1} fill="#cfe0ff" opacity="0.7" />
-      ))}
-    </svg>
-  );
-}
 
 /** `meta`: only the latest period and the next date (for the dashboard panel). */
 export function useReport(id?: number | null, meta = false) {
@@ -86,31 +36,19 @@ export function ReportPanel() {
   const { data } = useReport(null, true);
   const hasReport = !!(data?.latest || data?.archive.length);
   return (
-    <section
-      aria-labelledby="report-title"
-      className="relative flex h-full min-h-[200px] flex-col overflow-hidden rounded-2xl border border-[#3a2c8f] p-5 text-white shadow-card"
-      style={{ background: "radial-gradient(120% 120% at 100% 100%, #3b5bff 0%, transparent 45%), linear-gradient(140deg, #2a1670 0%, #4b22c9 55%, #2b2f9a 100%)" }}
-    >
-      <ReportArt className="pointer-events-none absolute -bottom-3 end-[-6px] w-36 opacity-95 sm:w-40" />
-      <div className="relative max-w-[68%]">
-        <h2 id="report-title" className="text-lg font-bold">
-          {t("report.title")}
-        </h2>
-        <p className="mt-1 text-sm leading-relaxed text-white/80">{t("report.desc")}</p>
-      </div>
-      <div className="relative mt-auto space-y-2 pt-4">
-        <Link
-          href="/report"
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/20"
-        >
-          <CalendarDays className="size-4" aria-hidden />
-          {hasReport ? t("report.view") : t("report.every")}
-        </Link>
-        <p className="text-xs text-white/75">
-          {t("report.every")} · {data ? t("report.next", { date: formatDay(data.nextAt, lang) }) : "…"}
-        </p>
-        {data && !hasReport && <p className="text-xs text-white/75">{t("report.none")}</p>}
-      </div>
+    <section aria-labelledby="report-title" className="border-t border-line pt-4">
+      <h2 id="report-title" className="text-[15px] font-semibold text-fg">
+        {t("report.title")}
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-muted">{t("report.desc")}</p>
+      <Link href="/report" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3.5 text-sm font-medium text-fg transition-colors hover:bg-surface-2">
+        <CalendarDays className="size-4 text-subtle" aria-hidden />
+        {hasReport ? t("report.view") : t("report.every")}
+      </Link>
+      <p className="mt-3 text-xs text-subtle">
+        {t("report.every")} · {data ? t("report.next", { date: formatDay(data.nextAt, lang) }) : "…"}
+      </p>
+      {data && !hasReport && <p className="mt-1 text-xs text-subtle">{t("report.none")}</p>}
     </section>
   );
 }
@@ -172,7 +110,7 @@ function ReportBody({ report }: { report: WeeklyReport }) {
         </ol>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {report.sections.map((sec) => {
           const label = shortCategoryLabel(sec.id);
           const Icon = CATEGORY_ICONS[sec.id];
@@ -180,7 +118,7 @@ function ReportBody({ report }: { report: WeeklyReport }) {
             <section key={sec.id} className="card p-5">
               <div className="mb-3 flex items-center gap-2.5">
                 {Icon && (
-                  <span className="inline-flex size-8 items-center justify-center rounded-lg text-white" style={{ background: categoryTint(sec.id).badge }}>
+                  <span className="inline-flex size-8 items-center justify-center rounded-lg border border-line bg-surface-2" style={{ color: categoryTint(sec.id).mark }}>
                     <Icon className="size-4" aria-hidden />
                   </span>
                 )}
@@ -204,7 +142,7 @@ function ReportBody({ report }: { report: WeeklyReport }) {
       {report.companies.length > 0 && (
         <section className="card p-5">
           <h2 className="mb-4 text-lg font-bold text-fg">{t("report.companies")}</h2>
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {report.companies.map((c) => {
               const company = companyById(c.id);
               const h = c.top ? storyHeadline(c.top, lang) : null;
@@ -230,15 +168,9 @@ function ReportBody({ report }: { report: WeeklyReport }) {
       )}
 
       {report.radar.length > 0 && (
-        <section className="card p-5">
-          <h2 className="mb-4 text-lg font-bold text-fg">{t("report.radar")}</h2>
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {report.radar.map((item) => (
-              <li key={item.id}>
-                <RadarItemCard item={item} />
-              </li>
-            ))}
-          </ul>
+        <section className="border-t border-line pt-5">
+          <h2 className="mb-5 text-xl font-semibold text-fg">{t("report.radar")}</h2>
+          <RadarTimeline items={report.radar} />
         </section>
       )}
     </div>

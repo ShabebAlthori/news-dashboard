@@ -11,9 +11,9 @@ export function TechPulseMark({ className = "size-9" }: { className?: string }) 
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
       <defs>
         <linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#a27bff" />
-          <stop offset="0.5" stopColor="#713bff" />
-          <stop offset="1" stopColor="#4388ff" />
+          <stop offset="0" stopColor="#a08cff" />
+          <stop offset="0.55" stopColor="#8b72ff" />
+          <stop offset="1" stopColor="#65a6ff" />
         </linearGradient>
       </defs>
       <path
@@ -25,17 +25,18 @@ export function TechPulseMark({ className = "size-9" }: { className?: string }) 
   );
 }
 
-export function Brand({ tagline = true, compact = false, onNavigate }: { tagline?: boolean; compact?: boolean; onNavigate?: () => void }) {
+/** Compact logo: the mark and the wordmark (the wordmark hides on the narrowest phones). */
+export function Brand({ tagline = false, compact = false, onNavigate }: { tagline?: boolean; compact?: boolean; onNavigate?: () => void }) {
   const { t } = useUi();
   return (
-    <Link href="/" onClick={onNavigate} className="flex min-h-11 min-w-11 items-center gap-3 rounded-lg" aria-label={compact ? t("app.name") : undefined}>
-      <TechPulseMark className={compact ? "size-9" : "size-10"} />
+    <Link href="/" onClick={onNavigate} className="flex min-h-11 min-w-11 items-center gap-2.5 rounded-lg" aria-label={t("app.name")}>
+      <TechPulseMark className="size-7 shrink-0" />
       {!compact && (
-        <span className="leading-tight">
-          <span className="block font-sans text-[19px] font-bold tracking-tight text-fg" lang="en" dir="ltr">
+        <span className="leading-tight max-[339px]:sr-only" aria-hidden>
+          <span className="block font-sans text-[17px] font-semibold tracking-[-0.02em] text-fg" lang="en" dir="ltr">
             {t("app.name")}
           </span>
-          {tagline && <span className="block text-[13px] text-muted">{t("app.tagline")}</span>}
+          {tagline && <span className="block text-xs text-subtle">{t("app.tagline")}</span>}
         </span>
       )}
     </Link>

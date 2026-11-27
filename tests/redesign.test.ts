@@ -195,7 +195,7 @@ describe("dashboard sections", () => {
   });
 
   it("offers the chips in the requested order", () => {
-    expect(DASHBOARD_CHIPS.map((c) => c.en)).toEqual(["All", "Data & Analytics", "AI", "Business", "Programming", "Cybersecurity", "Gaming", "Saudi Tech", "Robotics"]);
+    expect(DASHBOARD_CHIPS.map((c) => c.en)).toEqual(["All", "Data & Analytics", "AI", "Business", "Programming", "Cybersecurity", "Hardware & Gaming", "Saudi Tech", "Robotics"]);
   });
 });
 

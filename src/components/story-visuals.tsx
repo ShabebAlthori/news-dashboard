@@ -20,17 +20,20 @@ export const CATEGORY_ICONS: Record<string, typeof Star> = {
   robotics: Bot,
 };
 
-/** Solid badge colours (white text ≥ 4.5:1) so badges stay legible on photos in both themes. */
-const CATEGORY_TINTS: Record<string, { badge: string; art: [string, string] }> = {
-  data: { badge: "#6a35f0", art: ["#3b1d9c", "#0e1233"] },
-  ai: { badge: "#2563d9", art: ["#16418f", "#0b1030"] },
-  business: { badge: "#a15c06", art: ["#6b3d08", "#140f1c"] },
-  dev: { badge: "#0b7d6e", art: ["#0b5249", "#091526"] },
-  security: { badge: "#c2304a", art: ["#7a1a2e", "#130c1d"] },
-  "hardware-gaming": { badge: "#4a4fd8", art: ["#2b2f94", "#0c0f2c"] },
-  saudi: { badge: "#0b7f52", art: ["#0b5338", "#0a1622"] },
-  robotics: { badge: "#0a6f94", art: ["#0b4a63", "#0a1226"] },
-  other: { badge: "#4b5372", art: ["#2a3052", "#0c0f22"] },
+/**
+ * Each category has one identifying colour, used only as a small mark next to its name (and to
+ * tint the artwork of stories without a photo) — never as a filled badge.
+ */
+const CATEGORY_TINTS: Record<string, { mark: string }> = {
+  data: { mark: "#8b72ff" },
+  ai: { mark: "#65a6ff" },
+  business: { mark: "#e3a857" },
+  dev: { mark: "#45c2b1" },
+  security: { mark: "#f2777a" },
+  "hardware-gaming": { mark: "#e07bc4" },
+  saudi: { mark: "#56d6a0" },
+  robotics: { mark: "#4fc3e8" },
+  other: { mark: "#9298a8" },
 };
 
 export function categoryTint(id: string | undefined) {
@@ -43,41 +46,46 @@ export function useStoryCategory(story: Story): string | undefined {
   return storyCategory(story.categories, prefs?.categoryOrder ?? PRIORITY_IDS, story.primaryCategory);
 }
 
-export function CategoryBadge({ id, className = "" }: { id: string | undefined; className?: string }) {
+/** Category label: a small colour mark and the name. `tone="onImage"` for use over photos. */
+export function CategoryBadge({ id, className = "", tone = "default" }: { id: string | undefined; className?: string; tone?: "default" | "onImage" }) {
   const { lang } = useUi();
   if (!id) return null;
   const label = shortCategoryLabel(id)?.[lang];
   if (!label) return null;
+  const tones = tone === "onImage" ? "rounded-md bg-black/60 px-2 py-0.5 text-white" : "text-muted";
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white shadow-sm ${className}`} style={{ background: categoryTint(id).badge }}>
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${tones} ${className}`}>
+      <span className="size-1.5 shrink-0 rounded-full" style={{ background: categoryTint(id).mark }} aria-hidden />
       {label}
     </span>
   );
 }
 
-/** Abstract artwork for stories without a publisher image — never a stand-in photo. Varies by story. */
+/** Shown for stories without a publisher image — a quiet typographic tile, never a stand-in photo. */
 export function FallbackArt({ category, seed = 0, label, className = "" }: { category: string | undefined; seed?: number; label?: string; className?: string }) {
-  const tint = categoryTint(category);
   const Icon = (category && CATEGORY_ICONS[category]) || Sparkles;
   const h = Math.abs(seed * 2654435761) % 1000;
-  const x = 15 + (h % 70);
-  const y = 5 + ((h >> 3) % 40);
-  const grid = [22, 28, 34][h % 3];
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ background: `radial-gradient(120% 95% at ${x}% ${y}%, ${tint.art[0]} 0%, ${tint.art[1]} 72%)` }} aria-hidden>
+    <div className={`relative overflow-hidden bg-surface-2 ${className}`} aria-hidden>
       <div
-        className="absolute inset-0 opacity-[0.16]"
-        style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px)", backgroundSize: `${grid}px ${grid}px` }}
+        className="absolute inset-0 opacity-60"
+        style={{ backgroundImage: "radial-gradient(var(--border-strong) 1px, transparent 1px)", backgroundSize: `${[16, 20, 24][h % 3]}px ${[16, 20, 24][h % 3]}px` }}
       />
-      <div className="absolute -bottom-1/3 start-[-10%] size-2/3 rounded-full opacity-40 blur-2xl" style={{ background: tint.badge }} />
-      <Icon className={`absolute top-1/2 size-[38%] max-h-28 max-w-28 -translate-y-1/2 text-white/25 ${h % 2 ? "end-[12%]" : "end-[30%]"}`} strokeWidth={1.25} />
+      <span className="absolute start-0 top-0 h-full w-0.5" style={{ background: categoryTint(category).mark }} />
+      <Icon className={`absolute top-1/2 size-[30%] max-h-20 max-w-20 -translate-y-1/2 text-subtle/60 ${h % 2 ? "end-[12%]" : "end-[24%]"}`} strokeWidth={1.25} />
       {label && (
-        <span className="absolute start-4 top-3.5 max-w-[70%] truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55" dir="auto">
+        <span className="absolute start-4 top-3.5 max-w-[70%] truncate font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-subtle" dir="auto">
           {label}
         </span>
       )}
     </div>
   );
+}
+
+/** Whether a story's own photo should be shown (the reader can turn images off). */
+export function useShowImage(story: Story): boolean {
+  const { data: prefs } = useSWR<Prefs>("/api/settings");
+  return (prefs?.showImages ?? true) && !!story.imageUrl;
 }
 
 /** Publisher image (hotlinked, no referrer) with abstract art if it is missing or fails. */
@@ -108,9 +116,9 @@ export function StoryImage({ story, category, className = "", eager = false }: {
 export function OriginalLangTag({ langs, tone = "default", className = "" }: { langs: (Lang | null | undefined)[]; tone?: "default" | "onImage"; className?: string }) {
   const { t, lang } = useUi();
   if (!langs.some((l) => l && l !== lang)) return null;
-  const tones = tone === "onImage" ? "border-white/25 bg-black/55 text-white/90 backdrop-blur" : "border-line bg-surface-2 text-muted";
+  const tones = tone === "onImage" ? "border-white/25 bg-black/60 text-white/90" : "border-line text-subtle";
   return (
-    <span title={t("card.originalLangHint")} className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-4 ${tones} ${className}`}>
+    <span title={t("card.originalLangHint")} className={`inline-flex shrink-0 items-center whitespace-nowrap rounded border px-1.5 py-px text-[11px] font-medium leading-4 ${tones} ${className}`}>
       {t("card.originalLang")}
     </span>
   );
@@ -134,10 +142,10 @@ export function BookmarkButton({ story, className = "", tone = "default" }: { st
   }
   const tones =
     tone === "onImage"
-      ? "bg-black/45 text-white backdrop-blur hover:bg-black/60"
+      ? "bg-black/55 text-white hover:bg-black/70"
       : saved
-        ? "text-accent hover:bg-accent-soft"
-        : "text-muted hover:bg-surface-2 hover:text-fg";
+        ? "text-accent hover:bg-surface-2"
+        : "text-subtle hover:bg-surface-2 hover:text-fg";
   return (
     <button
       type="button"
@@ -145,7 +153,7 @@ export function BookmarkButton({ story, className = "", tone = "default" }: { st
       aria-pressed={saved}
       aria-label={saved ? t("card.saved") : t("card.save")}
       title={saved ? t("card.saved") : t("card.save")}
-      className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors ${tones} ${className}`}
+      className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors ${tones} ${className}`}
     >
       <Bookmark className={`size-[18px] ${saved ? "fill-current" : ""}`} aria-hidden />
     </button>

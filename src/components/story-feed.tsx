@@ -26,6 +26,10 @@ export interface FeedConfig {
   showCompanyFilter?: boolean;
   savedOnly?: boolean;
   company?: string;
+  /** Fixed category (category pages). */
+  category?: string;
+  /** Stories already shown above the feed (left out of it). */
+  excludeIds?: number[];
   requireQuery?: boolean;
   emptyTitle?: string;
   emptyHint?: string;
@@ -37,7 +41,7 @@ function useFeedParams(cfg: FeedConfig) {
   const sp = useSearchParams();
   const range = (RANGE_KEYS as string[]).includes(sp.get("range") ?? "") ? (sp.get("range") as RangeKey) : (cfg.defaultRange ?? "3d");
   return {
-    category: sp.get("cat") ?? "",
+    category: cfg.category ?? sp.get("cat") ?? "",
     company: cfg.company ?? sp.get("co") ?? "",
     range,
     from: sp.get("from") ?? "",
@@ -119,7 +123,8 @@ export function StoryFeed(cfg: FeedConfig) {
     { revalidateFirstPage: true, revalidateOnFocus: true },
   );
 
-  const stories = data?.flatMap((d) => d.stories) ?? [];
+  const exclude = new Set(cfg.excludeIds ?? []);
+  const stories = (data?.flatMap((d) => d.stories) ?? []).filter((s) => !exclude.has(s.id));
   const total = data?.[0]?.total ?? 0;
   const hasMore = data ? data[data.length - 1]?.nextCursor != null : false;
   const generatedAt = data?.[0]?.generatedAt;
@@ -131,7 +136,7 @@ export function StoryFeed(cfg: FeedConfig) {
     : (cfg.categorySections ?? []).flatMap((s) => categoriesFor(s));
   const followed = new Set(prefs?.followedCompanies ?? []);
   const companyOptions = [...COMPANIES].sort((a, b) => Number(followed.has(b.id)) - Number(followed.has(a.id)) || a.en.localeCompare(b.en));
-  const filtered = p.category || p.company !== (cfg.company ?? "") || p.range !== (cfg.defaultRange ?? "3d") || p.sort !== (cfg.defaultSort ?? "importance") || !p.group;
+  const filtered = p.category !== (cfg.category ?? "") || p.company !== (cfg.company ?? "") || p.range !== (cfg.defaultRange ?? "3d") || p.sort !== (cfg.defaultSort ?? "importance") || !p.group;
 
   return (
     <section>

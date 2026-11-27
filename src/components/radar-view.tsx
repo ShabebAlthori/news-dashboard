@@ -1,25 +1,26 @@
 "use client";
 
-import { ArrowRight, ExternalLink, Layers3, Star } from "lucide-react";
-import Link from "next/link";
+import { ArrowUpRight, Star } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import useSWR from "swr";
-import { formatDateTime, formatRelative } from "@/lib/shared/format";
+import { formatDateTime, formatLongDate, formatRelative, formatTime } from "@/lib/shared/format";
 import { isRadarLive } from "@/lib/shared/schedule";
-import type { RadarItem, RadarResponse, RadarType } from "@/lib/shared/types";
+import type { Lang, RadarItem, RadarResponse, RadarType } from "@/lib/shared/types";
+import { MoreLink, SectionHeader } from "./editorial";
 import { PlatformLogo } from "./logos";
 import { useNow, useUi } from "./providers";
 import { EmptyState, ErrorState, PageHeader } from "./states";
 import { useUpdateParams } from "./story-feed";
 
+/** One colour per item type, used only for the timeline dot and the small type label. */
 const TYPE_COLORS: Record<RadarType, string> = {
-  release: "#6a35f0",
-  research: "#2563d9",
-  update: "#0b7f52",
-  repository: "#4b5372",
+  release: "#8b72ff",
+  update: "#56d6a0",
+  research: "#65a6ff",
+  repository: "#9298a8",
 };
-const TYPES: RadarType[] = ["release", "research", "update", "repository"];
+const TYPES: RadarType[] = ["release", "update", "research", "repository"];
 
 /** `panel`: only what the dashboard panel shows (in the web edition, from the small home file). */
 export function useRadar(panel = false) {
@@ -29,7 +30,8 @@ export function useRadar(panel = false) {
 export function RadarTypeBadge({ type }: { type: RadarType }) {
   const { t } = useUi();
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white" style={{ background: TYPE_COLORS[type] }}>
+    <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em] text-subtle">
+      <span className="size-1.5 rounded-full" style={{ background: TYPE_COLORS[type] }} aria-hidden />
       {t(`radar.type.${type}`)}
     </span>
   );
@@ -42,7 +44,7 @@ export function RadarLiveBadge({ lastSuccessAt }: { lastSuccessAt: string | null
   if (isRadarLive(lastSuccessAt, now)) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded-full bg-ok-soft px-2.5 py-0.5 text-xs font-semibold text-ok"
+        className="inline-flex items-center gap-2 rounded-md border border-line px-2 py-1 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em] text-ok"
         title={t("radar.liveHint", { time: formatRelative(lastSuccessAt!, lang, now) })}
       >
         <span className="live-dot size-1.5 rounded-full bg-ok" aria-hidden />
@@ -57,99 +59,160 @@ export function RadarLiveBadge({ lastSuccessAt }: { lastSuccessAt: string | null
   );
 }
 
-export function RadarItemCard({ item, showSummary = false }: { item: RadarItem; showSummary?: boolean }) {
+/** One timeline entry: time, a dot on the line, platform and type, title, details. */
+function RadarEntry({ item, showSummary, timeMode }: { item: RadarItem; showSummary: boolean; timeMode: "clock" | "relative" }) {
   const { t, lang } = useUi();
   const now = useNow();
-  const when = item.publishedAt ?? item.fetchedAt;
+  const when = item.publishedAt;
   return (
-    <a href={item.url} target="_blank" rel="noopener noreferrer" className="group flex h-full gap-3.5 rounded-2xl border border-line bg-surface-2/60 p-4 transition-colors hover:border-line-strong hover:bg-surface-2">
-      <PlatformLogo sourceId={item.sourceId} platform={item.platform} size={42} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <p className="truncate text-xs font-medium text-muted" lang="en" dir="ltr">
-          {item.platform}
-        </p>
-        <p lang="en" dir="ltr" className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug text-fg group-hover:text-accent">
-          {item.title}
-        </p>
+    <li className="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-4">
+      <div className="pt-0.5 text-end font-mono text-xs tabular-nums text-subtle">
+        {when ? (
+          <time dateTime={when} title={formatDateTime(when, lang, now)}>
+            {timeMode === "clock" ? formatTime(when, lang) : shortAge(when, now, lang)}
+          </time>
+        ) : (
+          <span title={t("card.noPubDate")}>—</span>
+        )}
+      </div>
+      <div className="relative border-s border-line pb-7 ps-5">
+        <span className="absolute -start-[5px] top-1.5 size-[9px] rounded-full ring-4 ring-bg" style={{ background: TYPE_COLORS[item.type] }} aria-hidden />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="inline-flex items-center gap-2">
+            <PlatformLogo sourceId={item.sourceId} platform={item.platform} size={20} />
+            <span className="font-mono text-xs text-muted" lang="en" dir="ltr">
+              {item.platform}
+            </span>
+          </span>
+          <RadarTypeBadge type={item.type} />
+          {item.version && (
+            <span className="rounded border border-line px-1.5 font-mono text-[11.5px] leading-5 text-fg" lang="en" dir="ltr">
+              {item.version}
+            </span>
+          )}
+        </div>
+        <a href={item.url} target="_blank" rel="noopener noreferrer" lang="en" dir="ltr" className="group mt-1.5 flex items-start gap-1.5 text-[15px] font-medium leading-snug text-fg">
+          <span className="headline-link">{item.title}</span>
+          <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+        </a>
         {showSummary && item.summary && (
-          <p lang="en" dir="ltr" className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted">
+          <p lang="en" dir="ltr" className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">
             {item.summary}
           </p>
         )}
-        <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
-          <span className="text-xs text-subtle">
-            {item.type === "repository" && item.publishedAt ? (
-              t("radar.created", { time: formatRelative(item.publishedAt, lang, now) })
-            ) : item.publishedAt ? (
-              <time dateTime={item.publishedAt} title={formatDateTime(item.publishedAt, lang, now)}>
-                {formatRelative(when, lang, now)}
-              </time>
-            ) : (
-              t("card.noPubDate")
-            )}
-            {item.type === "repository" && item.stars != null && (
-              <span className="ms-2 inline-flex items-center gap-1">
+        {item.type === "repository" && (item.stars != null || item.language) && (
+          <p className="mt-1.5 flex items-center gap-3 font-mono text-xs text-subtle">
+            {item.stars != null && (
+              <span className="inline-flex items-center gap-1">
                 <Star className="size-3" aria-hidden />
                 {t("radar.stars", { n: item.stars })}
               </span>
             )}
-          </span>
-          <RadarTypeBadge type={item.type} />
-        </div>
+            {item.language && <span lang="en">{item.language}</span>}
+          </p>
+        )}
       </div>
-    </a>
+    </li>
   );
 }
 
-/** One release, one research paper and one update — the freshest of each. */
+/** Radar items as a compact timeline (weekly report). */
+export function RadarTimeline({ items }: { items: RadarItem[] }) {
+  return (
+    <ol className="[&>li:last-child>div:last-child]:pb-0">
+      {items.map((item) => (
+        <RadarEntry key={item.id} item={item} showSummary={false} timeMode="relative" />
+      ))}
+    </ol>
+  );
+}
+
+/** Compact age for the time column ("3h", "2d"; "3 س" in Arabic). */
+function shortAge(iso: string, now: number, lang: Lang): string {
+  const mins = Math.max(0, Math.round((now - Date.parse(iso)) / 60_000));
+  const [n, unit] = mins < 60 ? [Math.max(1, mins), lang === "ar" ? "د" : "m"] : mins < 2880 ? [Math.round(mins / 60), lang === "ar" ? "س" : "h"] : [Math.round(mins / 1440), lang === "ar" ? "ي" : "d"];
+  return lang === "ar" ? `${n} ${unit}` : `${n}${unit}`;
+}
+
+/** The freshest item of each type first, then the newest of the rest. */
 function panelPicks(items: RadarItem[], n: number): RadarItem[] {
   const out: RadarItem[] = [];
-  for (const type of ["release", "research", "update", "repository"] as RadarType[]) {
+  for (const type of TYPES) {
     const first = items.find((i) => i.type === type);
     if (first) out.push(first);
   }
   for (const i of items) if (out.length < n && !out.includes(i)) out.push(i);
-  return out.slice(0, n);
+  const time = (i: RadarItem) => Date.parse(i.publishedAt ?? i.fetchedAt);
+  return out.slice(0, n).sort((a, b) => time(b) - time(a));
 }
 
+function TypeLegend({ counts }: { counts?: Record<string, number> }) {
+  const { t } = useUi();
+  return (
+    <ul className="space-y-2.5">
+      {TYPES.map((ty) => (
+        <li key={ty} className="flex items-center justify-between gap-3 text-sm">
+          <span className="inline-flex items-center gap-2 text-muted">
+            <span className="size-2 rounded-full" style={{ background: TYPE_COLORS[ty] }} aria-hidden />
+            {t(`radar.type.${ty}`)}
+          </span>
+          {counts && <span className="font-mono text-xs tabular-nums text-subtle">{counts[ty] ?? 0}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Home page: the latest activity across the tracked data platforms, as a timeline. */
 export function RadarPanel() {
   const { t } = useUi();
   const { data, error } = useRadar(true);
-  const picks = data ? panelPicks(data.items, 3) : [];
+  const picks = data ? panelPicks(data.items, 6) : [];
   return (
-    <section className="card p-5" aria-labelledby="radar-title">
-      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Layers3 className="size-6 text-accent" aria-hidden />
-        <h2 id="radar-title" className="text-lg font-bold text-fg">
-          {t("radar.title")}
-        </h2>
-        {data && <RadarLiveBadge lastSuccessAt={data.lastSuccessAt} />}
-        <Link href="/radar" className="ms-auto inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent hover:underline">
-          {t("dash.seeAll")}
-          <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
-        </Link>
-      </div>
-      {error ? (
-        <p className="text-sm text-muted">{t("list.error")}</p>
-      ) : !data ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="skeleton h-[118px] rounded-2xl" />
-          ))}
+    <section aria-labelledby="radar-title">
+      <SectionHeader
+        id="radar-title"
+        size="lg"
+        eyebrow={t("radar.eyebrow")}
+        title={t("radar.title")}
+        hint={t("radar.subtitle")}
+        action={
+          <span className="flex items-center gap-3">
+            {data && <RadarLiveBadge lastSuccessAt={data.lastSuccessAt} />}
+            <MoreLink href="/radar">{t("radar.openAll")}</MoreLink>
+          </span>
+        }
+      />
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_260px]">
+        {error ? (
+          <p className="text-sm text-muted">{t("list.error")}</p>
+        ) : !data ? (
+          <div className="space-y-6" aria-busy="true">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-12 w-full" />
+            ))}
+          </div>
+        ) : picks.length === 0 ? (
+          <p className="text-sm text-muted">{t("radar.empty")}</p>
+        ) : (
+          <ol className="[&>li:last-child>div:last-child]:pb-0">
+            {picks.map((item) => (
+              <RadarEntry key={item.id} item={item} showSummary={false} timeMode="relative" />
+            ))}
+          </ol>
+        )}
+        <div className="border-t border-line pt-4 lg:border-s lg:border-t-0 lg:ps-8 lg:pt-0">
+          <p className="mb-3 text-sm text-muted">{t("radar.tracking")}</p>
+          <TypeLegend />
         </div>
-      ) : picks.length === 0 ? (
-        <p className="text-sm text-muted">{t("radar.empty")}</p>
-      ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {picks.map((item) => (
-            <li key={item.id}>
-              <RadarItemCard item={item} />
-            </li>
-          ))}
-        </ul>
-      )}
+      </div>
     </section>
   );
+}
+
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 export function RadarView() {
@@ -158,150 +221,145 @@ export function RadarView() {
   const sp = useSearchParams();
   const update = useUpdateParams();
   const { data, error, mutate } = useRadar();
-  const [limit, setLimit] = useState(36);
+  const [limit, setLimit] = useState(40);
   const type = (TYPES as string[]).includes(sp.get("type") ?? "") ? (sp.get("type") as RadarType) : null;
   const platform = sp.get("platform");
 
   const items = data?.items ?? [];
-  const platforms = [...new Map(items.map((i) => [i.platform, i.sourceId])).entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  const filtered = items.filter((i) => (!type || i.type === type) && (!platform || i.platform === platform));
-  const counts = Object.fromEntries(TYPES.map((ty) => [ty, items.filter((i) => i.type === ty && (!platform || i.platform === platform)).length]));
+  const platforms = [...new Set(items.map((i) => i.platform))].sort((a, b) => a.localeCompare(b));
+  const inPlatform = items.filter((i) => !platform || i.platform === platform);
+  const filtered = inPlatform.filter((i) => !type || i.type === type);
+  const counts = Object.fromEntries(TYPES.map((ty) => [ty, inPlatform.filter((i) => i.type === ty).length]));
+
+  // Group the visible items by day of publication (items without a date go last).
+  const shown = filtered.slice(0, limit);
+  const groups: { key: string; label: string; items: RadarItem[] }[] = [];
+  const today = dayKey(new Date(now).toISOString());
+  const yesterday = dayKey(new Date(now - 86_400_000).toISOString());
+  for (const item of shown) {
+    const key = item.publishedAt ? dayKey(item.publishedAt) : "undated";
+    let g = groups.find((x) => x.key === key);
+    if (!g) {
+      const label = key === "undated" ? t("radar.undated") : key === today ? t("radar.today") : key === yesterday ? t("radar.yesterday") : formatLongDate(new Date(item.publishedAt!), lang);
+      g = { key, label, items: [] };
+      groups.push(g);
+    }
+    g.items.push(item);
+  }
+
+  const pill = (on: boolean) =>
+    `inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors ${on ? "bg-surface-2 font-medium text-fg" : "text-muted hover:text-fg"}`;
 
   return (
     <>
-      <PageHeader title={t("radar.title")} subtitle={t("radar.subtitle")} actions={data ? <RadarLiveBadge lastSuccessAt={data.lastSuccessAt} /> : undefined} />
+      <PageHeader eyebrow={t("radar.eyebrow")} title={t("radar.title")} subtitle={t("radar.subtitle")} actions={data ? <RadarLiveBadge lastSuccessAt={data.lastSuccessAt} /> : undefined} />
       {error ? (
         <ErrorState onRetry={() => mutate()} />
       ) : !data ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-6" aria-busy="true">
           {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="skeleton h-36 rounded-2xl" />
+            <div key={i} className="skeleton h-14 w-full" />
           ))}
         </div>
       ) : (
-        <>
-          <div className="mb-4 flex flex-wrap gap-2" role="toolbar" aria-label={t("filters.category")}>
-            {[null, ...TYPES].map((ty) => {
-              const on = type === ty;
-              return (
-                <button
-                  key={ty ?? "all"}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => update({ type: ty })}
-                  className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors ${on ? "brand-gradient border-transparent text-white" : "border-line bg-surface text-fg hover:bg-surface-2"}`}
-                >
-                  {ty ? t(`radar.type.${ty}`) : t("radar.all")}
-                  <span className={`text-xs ${on ? "text-white/80" : "text-subtle"}`}>{ty ? counts[ty] : items.filter((i) => !platform || i.platform === platform).length}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="no-scrollbar -mx-4 mb-5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <div className="flex w-max gap-1.5 sm:w-auto sm:flex-wrap">
-              <button
-                type="button"
-                aria-pressed={!platform}
-                onClick={() => update({ platform: null })}
-                className={`rounded-full border px-3 py-1 text-xs ${!platform ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line text-muted hover:text-fg"}`}
-              >
-                {t("radar.all")}
-              </button>
-              {platforms.map(([name]) => (
-                <button
-                  key={name}
-                  type="button"
-                  aria-pressed={platform === name}
-                  onClick={() => update({ platform: platform === name ? null : name })}
-                  lang="en"
-                  className={`rounded-full border px-3 py-1 text-xs ${platform === name ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-line text-muted hover:text-fg"}`}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-          {lang === "ar" && <p className="mb-4 text-sm text-subtle">{t("radar.englishNote")}</p>}
-
-          {filtered.length === 0 ? (
-            <EmptyState title={items.length ? t("radar.emptyType") : t("radar.empty")} />
-          ) : !type ? (
-            // "All": one section per type, so a daily batch of papers does not bury releases.
-            <div className="space-y-8">
-              {(["release", "update", "research", "repository"] as RadarType[]).map((ty) => {
-                const list = filtered.filter((i) => i.type === ty);
-                if (!list.length) return null;
-                return (
-                  <section key={ty} aria-labelledby={`radar-${ty}`}>
-                    <div className="mb-3 flex items-center gap-3">
-                      <RadarTypeBadge type={ty} />
-                      <h2 id={`radar-${ty}`} className="sr-only">
-                        {t(`radar.type.${ty}`)}
-                      </h2>
-                      <span className="text-sm text-subtle">{list.length}</span>
-                      {list.length > 6 && (
-                        <button type="button" onClick={() => update({ type: ty })} className="ms-auto inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent hover:underline">
-                          {t("radar.seeType", { type: t(`radar.type.${ty}`) })}
-                          <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
-                        </button>
-                      )}
-                    </div>
-                    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {list.slice(0, 6).map((item) => (
-                        <li key={item.id}>
-                          <RadarItemCard item={item} showSummary />
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          ) : (
-            <>
-              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {filtered.slice(0, limit).map((item) => (
-                  <li key={item.id}>
-                    <RadarItemCard item={item} showSummary />
-                  </li>
-                ))}
-              </ul>
-              {filtered.length > limit && (
-                <div className="pt-5 text-center">
-                  <button type="button" onClick={() => setLimit(limit + 36)} className="rounded-full border border-line bg-surface px-5 py-2 text-sm font-medium text-fg hover:bg-surface-2">
-                    {t("list.loadMore")}
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0">
+            <div className="mb-8 flex flex-wrap items-center gap-3">
+              <div role="toolbar" aria-label={t("radar.filterType")} className="inline-flex flex-wrap rounded-lg border border-line p-0.5">
+                {[null, ...TYPES].map((ty) => (
+                  <button key={ty ?? "all"} type="button" aria-pressed={type === ty} onClick={() => update({ type: ty })} className={pill(type === ty)}>
+                    {ty && <span className="size-1.5 rounded-full" style={{ background: TYPE_COLORS[ty] }} aria-hidden />}
+                    {ty ? t(`radar.type.${ty}`) : t("radar.all")}
+                    <span className="font-mono text-xs tabular-nums text-subtle">{ty ? counts[ty] : inPlatform.length}</span>
                   </button>
-                </div>
-              )}
-            </>
-          )}
+                ))}
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-muted">
+                <span className="sr-only sm:not-sr-only">{t("radar.platform")}</span>
+                <select
+                  value={platform ?? ""}
+                  onChange={(e) => update({ platform: e.target.value || null })}
+                  className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-fg hover:border-line-strong"
+                >
+                  <option value="">{t("radar.allPlatforms")}</option>
+                  {platforms.map((p) => (
+                    <option key={p} value={p} lang="en">
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {lang === "ar" && <p className="-mt-4 mb-6 text-sm text-subtle">{t("radar.englishNote")}</p>}
 
-          <section className="mt-10">
-            <h2 className="text-lg font-bold text-fg">{t("radar.sources")}</h2>
-            <p className="mb-3 text-sm text-muted">{t("radar.sourcesHint")}</p>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {data.sources.map((s) => {
-                const ok = s.lastStatus === "ok" || s.lastStatus === "not-modified";
-                const state = ok ? t("sources.ok") : s.lastStatus === "error" ? t("sources.error") : s.lastStatus === "blocked" ? t("sources.blocked") : t("sources.pending");
-                return (
-                  <li key={s.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5">
-                    <PlatformLogo sourceId={s.id} platform={s.platform} size={32} />
-                    <div className="min-w-0 flex-1">
-                      <a href={s.homepage} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-fg hover:text-accent" lang="en">
-                        {s.platform}
-                        <ExternalLink className="size-3 text-subtle rtl:-scale-x-100" aria-hidden />
+            {filtered.length === 0 ? (
+              <EmptyState title={items.length ? t("radar.emptyType") : t("radar.empty")} />
+            ) : (
+              <div className="space-y-8">
+                {groups.map((g) => (
+                  <section key={g.key} aria-label={g.label}>
+                    <h2 className="eyebrow mb-4 ps-[4.75rem] sm:ps-[5.5rem]">{g.label}</h2>
+                    <ol className="[&>li:last-child>div:last-child]:pb-2">
+                      {g.items.map((item) => (
+                        <RadarEntry key={item.id} item={item} showSummary timeMode={g.key === "undated" ? "relative" : "clock"} />
+                      ))}
+                    </ol>
+                  </section>
+                ))}
+                {filtered.length > limit && (
+                  <div className="ps-[4.75rem] sm:ps-[5.5rem]">
+                    <button type="button" onClick={() => setLimit(limit + 40)} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm font-medium text-fg hover:bg-surface-2">
+                      {t("list.loadMore")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <aside className="space-y-8 lg:sticky lg:top-24 lg:self-start" aria-labelledby="radar-sources-title">
+            <div>
+              <p className="eyebrow mb-3">{t("radar.legend")}</p>
+              <TypeLegend counts={counts} />
+            </div>
+            <div className="border-t border-line pt-5">
+              <h2 id="radar-sources-title" className="text-[15px] font-semibold text-fg">
+                {t("radar.sources")}
+              </h2>
+              <p className="mb-4 mt-1 text-[13px] leading-relaxed text-subtle">{t("radar.sourcesHint")}</p>
+              <ul className="space-y-0.5">
+                {data.sources.map((s) => {
+                  const ok = s.lastStatus === "ok" || s.lastStatus === "not-modified";
+                  const state = ok ? t("sources.ok") : s.lastStatus === "error" ? t("sources.error") : s.lastStatus === "blocked" ? t("sources.blocked") : t("sources.pending");
+                  const dot = ok ? "bg-ok" : s.lastStatus === "error" ? "bg-caution" : s.lastStatus === "blocked" ? "bg-breaking" : "bg-subtle";
+                  return (
+                    <li key={s.id}>
+                      <a
+                        href={s.homepage}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface"
+                        title={s.lastError ?? (s.lastSuccessAt ? t("sources.lastSuccess", { time: formatRelative(s.lastSuccessAt, lang, now) }) : state)}
+                      >
+                        <PlatformLogo sourceId={s.id} platform={s.platform} size={24} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-fg" lang="en">
+                            {s.platform}
+                          </span>
+                          <span className="block truncate text-xs text-subtle">
+                            {state}
+                            {s.lastSuccessAt && <> · {formatRelative(s.lastSuccessAt, lang, now)}</>}
+                          </span>
+                        </span>
+                        <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
                       </a>
-                      <p className="truncate text-xs text-subtle" title={s.lastError ?? undefined}>
-                        <span className={ok ? "text-ok" : s.lastStatus === "error" ? "text-caution" : ""}>{state}</span>
-                        {s.lastSuccessAt && <> · {t("sources.lastSuccess", { time: formatRelative(s.lastSuccessAt, lang, now) })}</>}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        </>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </aside>
+        </div>
       )}
     </>
   );

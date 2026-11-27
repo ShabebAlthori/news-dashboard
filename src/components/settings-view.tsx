@@ -76,7 +76,7 @@ export function SettingsView() {
   return (
     <>
       <PageHeader title={t("page.settings.title")} actions={message ? <span className="text-sm text-ok" role="status">{message}</span> : null} />
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title={t("settings.display")}>
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

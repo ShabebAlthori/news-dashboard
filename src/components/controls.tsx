@@ -3,7 +3,7 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useUi, type ThemePref } from "./providers";
 
-/** EN | عربي segmented switch. Switching keeps the current page and filters. */
+/** EN | ع switch. Switching keeps the current page and filters. */
 export function LanguageToggle({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   const { lang, setLang } = useUi();
   const options = [
@@ -11,63 +11,75 @@ export function LanguageToggle({ className = "", compact = false }: { className?
     { value: "ar" as const, label: compact ? "ع" : "عربي", aria: "العربية" },
   ];
   return (
-    <div role="radiogroup" aria-label="Language / اللغة" className={`inline-flex items-center rounded-full border border-line bg-surface ${className}`}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={lang === o.value}
-          aria-label={o.aria}
-          lang={o.value}
-          onClick={() => setLang(o.value)}
-          className={`inline-flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
-            lang === o.value ? "brand-gradient text-white shadow-sm" : "text-muted hover:text-fg"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div role="radiogroup" aria-label="Language / اللغة" className={`inline-flex h-11 items-center ${className}`}>
+      <span className="inline-flex items-center rounded-lg border border-line p-0.5">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={lang === o.value}
+            aria-label={o.aria}
+            lang={o.value}
+            onClick={() => setLang(o.value)}
+            // 44px tall hit area around a compact 32px segment.
+            className={`relative inline-flex h-8 min-w-9 items-center justify-center rounded-md px-2 text-[13px] font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] ${
+              lang === o.value ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </span>
     </div>
   );
 }
 
-/** Sun — switch — moon. Picks an explicit light or dark theme. */
-export function ThemeSwitch({ rail = false }: { rail?: boolean }) {
+/** Light / dark in one icon button (header). */
+export function ThemeButton() {
   const { resolvedTheme, setTheme, t } = useUi();
   const dark = resolvedTheme === "dark";
   const label = dark ? t("theme.switchToLight") : t("theme.switchToDark");
-  if (rail) {
-    const Icon = dark ? Moon : Sun;
-    return (
-      <button
-        type="button"
-        onClick={() => setTheme(dark ? "light" : "dark")}
-        aria-label={label}
-        title={label}
-        className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface text-fg transition-colors hover:bg-surface-2"
-      >
-        <Icon className="size-[18px]" aria-hidden />
-      </button>
-    );
-  }
+  const Icon = dark ? Sun : Moon;
   return (
-    <div className="card flex items-center justify-center gap-4 px-4 py-3">
-      <Sun className={`size-[18px] transition-colors ${dark ? "text-subtle" : "text-caution"}`} aria-hidden />
-      <button
-        type="button"
-        role="switch"
-        aria-checked={dark}
-        aria-label={t("theme.dark")}
-        title={label}
-        onClick={() => setTheme(dark ? "light" : "dark")}
-        className={`relative inline-flex h-7 w-[52px] shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-2 after:content-[''] ${dark ? "brand-gradient" : "bg-surface-3"}`}
-      >
-        <span
-          className={`absolute top-1 start-1 size-5 rounded-full bg-white shadow transition-transform duration-200 ${dark ? "ltr:translate-x-6 rtl:-translate-x-6" : ""}`}
-        />
-      </button>
-      <Moon className={`size-[18px] transition-colors ${dark ? "text-accent-strong" : "text-subtle"}`} aria-hidden />
+    <button
+      type="button"
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      aria-label={label}
+      title={label}
+      className="inline-flex size-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+    >
+      <Icon className="size-[18px]" aria-hidden />
+    </button>
+  );
+}
+
+/** Light | Dark segmented control (drawer, footer). `rail` keeps the icon-only button. */
+export function ThemeSwitch({ rail = false }: { rail?: boolean }) {
+  const { resolvedTheme, setTheme, t } = useUi();
+  if (rail) return <ThemeButton />;
+  const options = [
+    { value: "light" as const, label: t("theme.light"), icon: Sun },
+    { value: "dark" as const, label: t("theme.dark"), icon: Moon },
+  ];
+  return (
+    <div role="radiogroup" aria-label={t("settings.theme")} className="inline-flex items-center rounded-lg border border-line p-0.5">
+      {options.map(({ value, label, icon: Icon }) => {
+        const on = resolvedTheme === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => setTheme(value)}
+            className={`inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors ${on ? "bg-surface-2 font-medium text-fg" : "text-muted hover:text-fg"}`}
+          >
+            <Icon className="size-4" aria-hidden />
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -104,7 +116,7 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-line bg-surface-2 p-1">
+    <div role="radiogroup" aria-label={label} className="inline-flex flex-wrap rounded-lg border border-line p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -113,7 +125,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           lang={o.lang}
           onClick={() => onChange(o.value)}
-          className={`min-h-10 rounded-lg px-3.5 py-1.5 text-sm transition-colors ${value === o.value ? "brand-gradient font-semibold text-white shadow-sm" : "text-muted hover:text-fg"}`}
+          className={`min-h-10 rounded-md px-3.5 py-1.5 text-sm transition-colors ${value === o.value ? "bg-surface-2 font-medium text-fg" : "text-muted hover:text-fg"}`}
         >
           {o.label}
         </button>
@@ -137,10 +149,10 @@ export function Switch({ checked, onChange, label, hint, id }: { checked: boolea
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors after:absolute after:-inset-2.5 after:content-[''] ${checked ? "border-transparent brand-gradient" : "border-line-strong bg-surface-2"}`}
+        className={`relative mt-1 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-2.5 after:content-[''] ${checked ? "bg-brand" : "bg-surface-3"}`}
       >
         <span
-          className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"}`}
+          className={`inline-block size-5 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-[18px] rtl:-translate-x-[18px]" : "translate-x-0.5 rtl:-translate-x-0.5"}`}
         />
       </button>
     </div>
